@@ -35,7 +35,14 @@ def _now_ts():
 def load_buffer():
     if os.path.exists(BUFFER_PATH):
         with open(BUFFER_PATH) as f:
-            _active.update(json.load(f))
+            data = json.load(f)
+        # Backfill any fields that didn't exist when the buffer was saved
+        for state in data.values():
+            state.setdefault("origin_name", None)
+            state.setdefault("origin_city", None)
+            state.setdefault("origin_region", None)
+            state.setdefault("origin_country", None)
+        _active.update(data)
         print(f"Resumed {len(_active)} in-flight aircraft from buffer.")
 
 
