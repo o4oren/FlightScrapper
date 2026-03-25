@@ -38,6 +38,7 @@ def load_buffer():
             data = json.load(f)
         # Backfill any fields that didn't exist when the buffer was saved
         for state in data.values():
+            state.setdefault("tail", "")
             state.setdefault("origin_name", None)
             state.setdefault("origin_city", None)
             state.setdefault("origin_region", None)
@@ -73,6 +74,7 @@ def process_poll(aircraft_list):
             continue
 
         callsign = (ac.get("flight") or "").strip()
+        tail = (ac.get("r") or "").strip()
         lat = ac.get("lat")
         lon = ac.get("lon")
         alt = _altitude(ac)
@@ -88,6 +90,7 @@ def process_poll(aircraft_list):
                 continue  # mid-join: discard
             _active[hex_id] = {
                 "callsign": callsign,
+                "tail": tail,
                 "first_seen": now_ts,
                 "last_seen": now_ts,
                 "last_lat": lat,
@@ -130,6 +133,7 @@ def process_poll(aircraft_list):
 
         # Update state
         state["callsign"] = callsign or state["callsign"]
+        state["tail"] = tail or state.get("tail", "")
         state["last_seen"] = now_ts
         state["last_lat"] = lat
         state["last_lon"] = lon
@@ -155,6 +159,7 @@ def process_poll(aircraft_list):
 
                 flight = {
                     "callsign": state["callsign"],
+                    "tail": state.get("tail", ""),
                     "aircraft_type": AIRCRAFT_TYPE,
                     "icao_hex": hex_id,
                     "origin_icao": state["origin_icao"],
