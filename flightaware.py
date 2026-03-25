@@ -110,19 +110,28 @@ def fetch_flights_for_tail(tail):
     return flights
 
 
-def run_batch(tails):
+def run_batch():
     """
-    Fetch flights for all known tails. Returns (saved, skipped) counts.
-    Respects a short delay between calls to stay within rate limits.
+    Fetch flights for all tails due for a refresh (never fetched or last fetched > 7 days ago).
+    Records successful fetches so tails are suppressed for the next 7 days.
+    Returns (saved, skipped) counts.
     """
     import database
+    import tails as tails_store
+
+    due = tails_store.get_tails_due_for_fetch()
+    total_known = len(tails_store.get_tails())
+
+    if not due:
+        print(f"[FlightAware] All {total_known} tail(s) fetched within the last 7 days — skipping batch.")
+        return 0, 0
 
     saved = 0
     skipped = 0
-    total = len(tails)
+    total = len(due)
+    print(f"[FlightAware] Starting batch for {total}/{total_known} tail(s) due for refresh...")
 
-    print(f"[FlightAware] Starting batch for {total} tail(s)...")
-    for i, tail in enumerate(sorted(tails), 1):
+    for i, tail in enumerate(due, 1):
         try:
             flights = fetch_flights_for_tail(tail)
             tail_saved = 0
@@ -139,6 +148,7 @@ def run_batch(tails):
                     skipped += 1
             print(f"  [FA] {tail} ({i}/{total}): {len(flights)} fetched, "
                   f"{tail_saved} saved, {tail_skipped} already known")
+            tails_store.record_fa_fetch(tail)
         except Exception as e:
             print(f"  [FA] Error fetching {tail}: {e}")
         time.sleep(0.5)  # be polite to the API

@@ -69,9 +69,8 @@ def main():
                     if last_fa_run else FLIGHTAWARE_BATCH_INTERVAL_HOURS
                 )
                 if hours_since >= FLIGHTAWARE_BATCH_INTERVAL_HOURS:
-                    known = tails_store.get_tails()
-                    if known:
-                        flightaware.run_batch(known)
+                    if tails_store.get_tails():
+                        flightaware.run_batch()
                     last_fa_run = now
 
         except Exception as e:
