@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from airports import snap_to_airport
 import tails as tails_store
 from config import (
-    AIRCRAFT_TYPE,
     BUFFER_PATH,
     LANDING_ALTITUDE_FT,
     LANDING_TIMEOUT_SECONDS,
@@ -40,6 +39,7 @@ def load_buffer():
         # Backfill any fields that didn't exist when the buffer was saved
         for state in data.values():
             state.setdefault("tail", "")
+            state.setdefault("aircraft_type", "")
             state.setdefault("origin_name", None)
             state.setdefault("origin_city", None)
             state.setdefault("origin_region", None)
@@ -76,6 +76,7 @@ def process_poll(aircraft_list):
 
         callsign = (ac.get("flight") or "").strip()
         tail = (ac.get("r") or "").strip()
+        aircraft_type = (ac.get("t") or "").strip()
         lat = ac.get("lat")
         lon = ac.get("lon")
         alt = _altitude(ac)
@@ -97,6 +98,7 @@ def process_poll(aircraft_list):
             _active[hex_id] = {
                 "callsign": callsign,
                 "tail": tail,
+                "aircraft_type": aircraft_type,
                 "first_seen": now_ts,
                 "last_seen": now_ts,
                 "last_lat": lat,
@@ -140,6 +142,7 @@ def process_poll(aircraft_list):
         # Update state
         state["callsign"] = callsign or state["callsign"]
         state["tail"] = tail or state.get("tail", "")
+        state["aircraft_type"] = aircraft_type or state.get("aircraft_type", "")
         state["last_seen"] = now_ts
         state["last_lat"] = lat
         state["last_lon"] = lon
@@ -166,7 +169,7 @@ def process_poll(aircraft_list):
                 flight = {
                     "callsign": state["callsign"],
                     "tail": state.get("tail", ""),
-                    "aircraft_type": AIRCRAFT_TYPE,
+                    "aircraft_type": state.get("aircraft_type", ""),
                     "icao_hex": hex_id,
                     "origin_icao": state["origin_icao"],
                     "origin_name": state["origin_name"],

@@ -13,7 +13,6 @@ from config import (
     FLIGHTAWARE_API_KEY,
     FLIGHTAWARE_API_URL,
     FLIGHTAWARE_LOOKBACK_DAYS,
-    AIRCRAFT_TYPE,
 )
 
 SESSION = requests.Session()
@@ -85,7 +84,7 @@ def fetch_flights_for_tail(tail):
         flights.append({
             "callsign": (f.get("ident") or "").strip(),
             "tail": tail,
-            "aircraft_type": f.get("aircraft_type") or AIRCRAFT_TYPE,
+            "aircraft_type": (f.get("aircraft_type") or "").strip(),
             "icao_hex": "",
             "origin_icao": origin_icao,
             "origin_name": origin_name,

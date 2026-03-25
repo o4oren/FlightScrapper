@@ -2,22 +2,28 @@ import json
 import random
 import time
 import requests
-from config import ADSB_API_URL, AIRCRAFT_TYPE, CALLSIGN_PREFIXES
+from config import ADSB_API_URL, AIRCRAFT_TYPES, CALLSIGN_PREFIXES
 
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "FlightScrapper/1.0 (personal research)"})
 
 
 def fetch_aircraft():
-    url = ADSB_API_URL.format(aircraft_type=AIRCRAFT_TYPE)
-    resp = SESSION.get(url, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
-    aircraft = data.get("ac", [])
+    seen_hexes = set()
+    all_aircraft = []
+    for aircraft_type in AIRCRAFT_TYPES:
+        url = ADSB_API_URL.format(aircraft_type=aircraft_type)
+        resp = SESSION.get(url, timeout=15)
+        resp.raise_for_status()
+        for ac in resp.json().get("ac", []):
+            hex_id = ac.get("hex", "").lower()
+            if hex_id and hex_id not in seen_hexes:
+                seen_hexes.add(hex_id)
+                all_aircraft.append(ac)
     if not CALLSIGN_PREFIXES:
-        return aircraft
+        return all_aircraft
     return [
-        ac for ac in aircraft
+        ac for ac in all_aircraft
         if any((ac.get("flight") or "").strip().startswith(p) for p in CALLSIGN_PREFIXES)
     ]
 

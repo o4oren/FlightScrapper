@@ -3,7 +3,7 @@ import os
 # Filter configuration — edit these to track different aircraft/airlines
 # Fedex feeder operatiors: "BVN", "CPT", "IRO", "CFS", "MTN", "PCM", "WIG", "MAL", "AIG"
 # DHL feeder operatiors: "DHK", "DHX", "VEC", "TJN", "BOX", "JOS", "SNC", "BEZ", "SET"
-AIRCRAFT_TYPE = "C208"
+AIRCRAFT_TYPES = ["C208", "C408"]  # List of ICAO type designators to track
 CALLSIGN_PREFIXES = ["BVN", "CPT", "IRO", "CFS", "MTN", "PCM", "WIG", "MAL", "AIG", "DHK", "DHX", "VEC", "TJN", "BOX", "JOS", "SNC", "BEZ", "SET"]  # Empty list = accept all callsigns
 
 # Polling
@@ -30,7 +30,7 @@ FLIGHTAWARE_BATCH_INTERVAL_HOURS = 24  # How often to run the FlightAware batch
 
 # Known tail numbers — seed list, runtime additions saved to tails.json
 # adsb.lol will add new tails automatically as they are observed
-KNOWN_TAILS = []
+KNOWN_TAILS = ["N962HL", "N960HL", "N961HL", "N963HL", "N965HL","N920HL", "N910HL"]
 
 # Paths
 AIRPORTS_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"

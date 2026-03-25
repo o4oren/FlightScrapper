@@ -15,7 +15,7 @@ import flightaware
 import tails as tails_store
 import tracker
 from config import (
-    AIRCRAFT_TYPE, CALLSIGN_PREFIXES, FLIGHTAWARE_API_KEY,
+    AIRCRAFT_TYPES, CALLSIGN_PREFIXES, FLIGHTAWARE_API_KEY,
     FLIGHTAWARE_BATCH_INTERVAL_HOURS, POLL_INTERVAL_SECONDS, POLL_JITTER_SECONDS,
 )
 from poller import fetch_aircraft, jittered_sleep
@@ -32,7 +32,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_shutdown)
 
     print(f"FlightScrapper starting.")
-    print(f"  Aircraft type : {AIRCRAFT_TYPE}")
+    print(f"  Aircraft types: {', '.join(AIRCRAFT_TYPES)}")
     print(f"  Callsign filter: {CALLSIGN_PREFIXES or 'all'}")
     print(f"  Poll interval : {POLL_INTERVAL_SECONDS}s ± {POLL_JITTER_SECONDS}s")
 
