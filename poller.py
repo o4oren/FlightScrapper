@@ -3,6 +3,7 @@ import random
 import time
 import requests
 from config import ADSB_API_URL, AIRCRAFT_TYPES, CALLSIGN_PREFIXES
+import tails as tails_store
 
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "FlightScrapper/1.0 (personal research)"})
@@ -22,9 +23,11 @@ def fetch_aircraft():
                 all_aircraft.append(ac)
     if not CALLSIGN_PREFIXES:
         return all_aircraft
+    known_tails = tails_store.get_tails()
     return [
         ac for ac in all_aircraft
         if any((ac.get("flight") or "").strip().startswith(p) for p in CALLSIGN_PREFIXES)
+        or (ac.get("r") or "").strip() in known_tails
     ]
 
 
