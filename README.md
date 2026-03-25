@@ -18,7 +18,9 @@ Every 60 seconds, FlightScrapper fetches all airborne aircraft matching the conf
 
 Each aircraft is tracked in memory. When an aircraft's altitude crosses 500ft upward, a takeoff is recorded and its position is snapped to the nearest airport in the [OurAirports](https://ourairports.com/data/) database. When the aircraft disappears from the feed below 3000ft for 5+ minutes, a landing is recorded and its last known position is snapped to the nearest airport.
 
-A flight record is written to the database **only** when both origin and destination airports are successfully identified. Partial flights, mid-flight detections, and unresolvable positions are silently discarded.
+If an aircraft is first seen already airborne but below 2000ft and its position snaps cleanly to a known airport, it is accepted as a near-takeoff join — handling cases where the poller first detects the aircraft just after liftoff (e.g. low-altitude ADS-B coverage areas like the Caribbean). Aircraft first seen above 2000ft are discarded as mid-flight joins.
+
+A flight record is written to the database **only** when both origin and destination airports are successfully identified. Partial flights, unresolvable positions, and high-altitude mid-joins are silently discarded.
 
 Any new tail number observed flying under a matching callsign prefix is added to `data/tails.json` for FlightAware enrichment.
 
@@ -26,7 +28,7 @@ Any new tail number observed flying under a matching callsign prefix is added to
 
 Once every 24 hours, FlightScrapper runs a batch job against the FlightAware AeroAPI. For each known tail number that has not been successfully fetched in the last **7 days**, it calls `GET /flights/{tail}` to retrieve up to 14 days of completed flight history with authoritative origin, destination, and times.
 
-Each returned flight is inserted into the database only if no record with the same tail number and departure date already exists (deduplication). On success, the tail's last-fetch timestamp is updated — suppressing it from the next 7 days of batches.
+Each returned flight is inserted into the database only if no record with the same callsign, aircraft type, origin, destination, and departure date already exists (deduplication). On success, the tail's last-fetch timestamp is updated — suppressing it from the next 7 days of batches.
 
 This makes FlightAware coverage additive: it fills in flights that ADS-B missed (Caribbean routes, coverage gaps) without duplicating what adsb.lol already captured.
 
@@ -109,7 +111,8 @@ All settings are in `config.py`:
 
 | Setting | Default | Description |
 |---|---|---|
-| `TAKEOFF_ALTITUDE_FT` | `500` | Altitude threshold for takeoff detection |
+| `TAKEOFF_ALTITUDE_FT` | `500` | Altitude threshold for normal takeoff detection |
+| `NEAR_AIRPORT_ALT_FT` | `2000` | First observation below this + snaps to airport = accepted as near-takeoff join |
 | `LANDING_ALTITUDE_FT` | `3000` | Maximum altitude when disappearing to count as a landing |
 | `LANDING_TIMEOUT_SECONDS` | `300` | Seconds unseen before declaring an aircraft landed |
 | `SNAP_RADIUS_KM_PRIMARY` | `3.0` | Primary airport snap radius in km |
