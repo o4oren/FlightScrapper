@@ -6,6 +6,7 @@ completed flights (with resolved origin/destination) in a SQLite database.
 
 import signal
 import sys
+from datetime import datetime, timezone
 
 import airports
 import database
@@ -38,7 +39,8 @@ def main():
         try:
             aircraft_list = fetch_aircraft()
             poll_count += 1
-            print(f"[poll #{poll_count}] {len(aircraft_list)} aircraft matching filters")
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            print(f"[{now}] poll #{poll_count} — {len(aircraft_list)} aircraft matching filters")
 
             completed = tracker.process_poll(aircraft_list)
             for flight in completed:
