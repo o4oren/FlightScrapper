@@ -11,9 +11,10 @@ POLL_INTERVAL_SECONDS = 60
 POLL_JITTER_SECONDS = 10
 
 # Flight detection thresholds
-TAKEOFF_ALTITUDE_FT = 500       # Aircraft crosses this going up = takeoff
-LANDING_ALTITUDE_FT = 3000      # Aircraft below this when it disappears = landed
-LANDING_TIMEOUT_SECONDS = 300   # Seconds unseen before declaring landed
+TAKEOFF_ALTITUDE_FT = 500        # Aircraft crosses this going up = takeoff
+LANDING_ALTITUDE_FT = 3000       # Aircraft below this when it disappears = landed
+LANDING_TIMEOUT_SECONDS = 300    # Seconds unseen before declaring landed
+NEAR_AIRPORT_ALT_FT = 2000       # First observation below this + snaps to airport = accept as fresh takeoff
 
 # Airport snap
 SNAP_RADIUS_KM_PRIMARY = 3.0

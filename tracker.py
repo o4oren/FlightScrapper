@@ -13,6 +13,7 @@ from config import (
     BUFFER_PATH,
     LANDING_ALTITUDE_FT,
     LANDING_TIMEOUT_SECONDS,
+    NEAR_AIRPORT_ALT_FT,
     TAKEOFF_ALTITUDE_FT,
 )
 
@@ -93,9 +94,38 @@ def process_poll(aircraft_list):
             tails_store.save_tails()
 
         if hex_id not in _active:
-            # New aircraft — only track if it's on the ground or very low (not mid-join)
+            # New aircraft — discard if clearly mid-flight
+            if alt > NEAR_AIRPORT_ALT_FT:
+                continue  # mid-join: too high to recover origin
+            # If below NEAR_AIRPORT_ALT_FT and snaps to an airport, treat as fresh takeoff
             if alt > TAKEOFF_ALTITUDE_FT:
-                continue  # mid-join: discard
+                origin_ap, _ = snap_to_airport(lat, lon)
+                if not origin_ap:
+                    continue  # airborne but not near any airport — discard
+                # Accept as a near-takeoff join: start already airborne with origin resolved
+                _active[hex_id] = {
+                    "callsign": callsign,
+                    "tail": tail,
+                    "aircraft_type": aircraft_type,
+                    "first_seen": now_ts,
+                    "last_seen": now_ts,
+                    "last_lat": lat,
+                    "last_lon": lon,
+                    "last_alt": alt,
+                    "max_alt": alt,
+                    "airborne": True,
+                    "origin_icao": origin_ap["icao"],
+                    "origin_name": origin_ap["name"],
+                    "origin_city": origin_ap["city"],
+                    "origin_region": origin_ap["region"],
+                    "origin_country": origin_ap["country"],
+                    "origin_lat": lat,
+                    "origin_lon": lon,
+                    "departure_time": _now_iso(),
+                }
+                print(f"  Near-takeoff join: {callsign or hex_id} from {origin_ap['icao']} ({origin_ap['city']}) at {alt}ft")
+                continue
+            # On the ground or below takeoff threshold — track normally
             _active[hex_id] = {
                 "callsign": callsign,
                 "tail": tail,
