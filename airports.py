@@ -6,7 +6,7 @@ from config import AIRPORTS_CSV_URL, AIRPORTS_CSV_PATH, SNAP_RADIUS_KM_PRIMARY, 
 
 AIRPORT_TYPES = {"small_airport", "medium_airport", "large_airport"}
 
-_airports = []  # [{icao, lat, lon, name}]
+_airports = []  # [{icao, lat, lon, name, city, region, country}]
 
 
 def _haversine_km(lat1, lon1, lat2, lon2):
@@ -44,21 +44,32 @@ def load_airports():
                 lon = float(row["longitude_deg"])
             except ValueError:
                 continue
-            _airports.append({"icao": icao, "lat": lat, "lon": lon, "name": row.get("name", "")})
+            # iso_region format is "US-TN" — extract the state/province part
+            iso_region = row.get("iso_region", "")
+            region = iso_region.split("-", 1)[1] if "-" in iso_region else iso_region
+            _airports.append({
+                "icao": icao,
+                "lat": lat,
+                "lon": lon,
+                "name": row.get("name", ""),
+                "city": row.get("municipality", ""),
+                "region": region,
+                "country": row.get("iso_country", ""),
+            })
     print(f"Loaded {len(_airports)} airports.")
 
 
 def snap_to_airport(lat, lon):
-    """Return (icao, distance_km) for nearest airport, or (None, None) if outside fallback radius."""
-    best_icao = None
+    """Return (airport_dict, distance_km) for nearest airport, or (None, None) if outside fallback radius."""
+    best_ap = None
     best_dist = float("inf")
     for ap in _airports:
         d = _haversine_km(lat, lon, ap["lat"], ap["lon"])
         if d < best_dist:
             best_dist = d
-            best_icao = ap["icao"]
-    if best_dist <= SNAP_RADIUS_KM_PRIMARY:
-        return best_icao, best_dist
-    if best_dist <= SNAP_RADIUS_KM_FALLBACK:
-        return best_icao, best_dist
+            best_ap = ap
+    if best_ap and best_dist <= SNAP_RADIUS_KM_PRIMARY:
+        return best_ap, best_dist
+    if best_ap and best_dist <= SNAP_RADIUS_KM_FALLBACK:
+        return best_ap, best_dist
     return None, None

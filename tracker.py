@@ -19,7 +19,8 @@ from config import (
 # Active flights buffer: { hex: flight_state }
 # flight_state keys:
 #   callsign, first_seen, last_seen, last_lat, last_lon, last_alt,
-#   airborne (bool), origin_icao, origin_lat, origin_lon, departure_time
+#   airborne (bool), origin_icao, origin_name, origin_city, origin_region,
+#   origin_country, origin_lat, origin_lon, departure_time
 _active = {}
 
 
@@ -87,6 +88,10 @@ def process_poll(aircraft_list):
                 "last_alt": alt,
                 "airborne": False,
                 "origin_icao": None,
+                "origin_name": None,
+                "origin_city": None,
+                "origin_region": None,
+                "origin_country": None,
                 "origin_lat": None,
                 "origin_lon": None,
                 "departure_time": None,
@@ -98,14 +103,18 @@ def process_poll(aircraft_list):
 
         # Detect takeoff
         if not state["airborne"] and prev_alt <= TAKEOFF_ALTITUDE_FT and alt > TAKEOFF_ALTITUDE_FT:
-            origin_icao, _ = snap_to_airport(state["last_lat"], state["last_lon"])
-            if origin_icao:
+            origin_ap, _ = snap_to_airport(state["last_lat"], state["last_lon"])
+            if origin_ap:
                 state["airborne"] = True
-                state["origin_icao"] = origin_icao
+                state["origin_icao"] = origin_ap["icao"]
+                state["origin_name"] = origin_ap["name"]
+                state["origin_city"] = origin_ap["city"]
+                state["origin_region"] = origin_ap["region"]
+                state["origin_country"] = origin_ap["country"]
                 state["origin_lat"] = state["last_lat"]
                 state["origin_lon"] = state["last_lon"]
                 state["departure_time"] = _now_iso()
-                print(f"  Takeoff: {callsign or hex_id} from {origin_icao}")
+                print(f"  Takeoff: {callsign or hex_id} from {origin_ap['icao']} ({origin_ap['city']})")
             else:
                 # Can't snap origin — discard by removing
                 del _active[hex_id]
@@ -130,8 +139,8 @@ def process_poll(aircraft_list):
 
         # Timed out — attempt to close the flight
         if state["airborne"] and state["last_alt"] <= LANDING_ALTITUDE_FT:
-            dest_icao, _ = snap_to_airport(state["last_lat"], state["last_lon"])
-            if dest_icao and state["origin_icao"] and dest_icao != state["origin_icao"]:
+            dest_ap, _ = snap_to_airport(state["last_lat"], state["last_lon"])
+            if dest_ap and state["origin_icao"] and dest_ap["icao"] != state["origin_icao"]:
                 arrival_time = _now_iso()
                 departure_dt = datetime.fromisoformat(state["departure_time"])
                 arrival_dt = datetime.fromisoformat(arrival_time)
@@ -142,9 +151,17 @@ def process_poll(aircraft_list):
                     "aircraft_type": AIRCRAFT_TYPE,
                     "icao_hex": hex_id,
                     "origin_icao": state["origin_icao"],
-                    "dest_icao": dest_icao,
+                    "origin_name": state["origin_name"],
+                    "origin_city": state["origin_city"],
+                    "origin_region": state["origin_region"],
+                    "origin_country": state["origin_country"],
                     "origin_lat": state["origin_lat"],
                     "origin_lon": state["origin_lon"],
+                    "dest_icao": dest_ap["icao"],
+                    "dest_name": dest_ap["name"],
+                    "dest_city": dest_ap["city"],
+                    "dest_region": dest_ap["region"],
+                    "dest_country": dest_ap["country"],
                     "dest_lat": state["last_lat"],
                     "dest_lon": state["last_lon"],
                     "departure_time": state["departure_time"],
@@ -155,7 +172,8 @@ def process_poll(aircraft_list):
                 completed_flights.append(flight)
                 print(
                     f"  Landed:  {state['callsign'] or hex_id} "
-                    f"{state['origin_icao']} -> {dest_icao} "
+                    f"{state['origin_icao']} ({state['origin_city']}) -> "
+                    f"{dest_ap['icao']} ({dest_ap['city']}) "
                     f"({round(duration_min)}min)"
                 )
 
