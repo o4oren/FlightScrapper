@@ -25,13 +25,15 @@ CREATE TABLE IF NOT EXISTS flights (
     departure_time  TEXT NOT NULL,
     arrival_time    TEXT NOT NULL,
     duration_min    REAL NOT NULL,
-    recorded_at     TEXT NOT NULL
+    recorded_at     TEXT NOT NULL,
+    source          TEXT NOT NULL DEFAULT 'adsb'
 );
 """
 
 
 MIGRATIONS = [
     "ALTER TABLE flights ADD COLUMN tail TEXT",
+    "ALTER TABLE flights ADD COLUMN source TEXT NOT NULL DEFAULT 'adsb'",
     "ALTER TABLE flights ADD COLUMN origin_name TEXT",
     "ALTER TABLE flights ADD COLUMN origin_city TEXT",
     "ALTER TABLE flights ADD COLUMN origin_region TEXT",
@@ -55,40 +57,75 @@ def init_db():
         conn.commit()
 
 
-def save_flight(flight):
+def _departure_date(flight):
+    """Extract YYYY-MM-DD from departure_time for dedup key."""
+    return (flight.get("departure_time") or "")[:10]
+
+
+def flight_exists(flight):
+    """Return True if a flight with the same tail + departure date already exists."""
+    tail = flight.get("tail", "")
+    date = _departure_date(flight)
+    if not tail or not date:
+        return False
     with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            """INSERT INTO flights
-               (callsign, tail, aircraft_type, icao_hex,
-                origin_icao, origin_name, origin_city, origin_region, origin_country,
-                origin_lat, origin_lon,
-                dest_icao, dest_name, dest_city, dest_region, dest_country,
-                dest_lat, dest_lon,
-                departure_time, arrival_time, duration_min, recorded_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                flight["callsign"],
-                flight["tail"],
-                flight["aircraft_type"],
-                flight["icao_hex"],
-                flight["origin_icao"],
-                flight["origin_name"],
-                flight["origin_city"],
-                flight["origin_region"],
-                flight["origin_country"],
-                flight["origin_lat"],
-                flight["origin_lon"],
-                flight["dest_icao"],
-                flight["dest_name"],
-                flight["dest_city"],
-                flight["dest_region"],
-                flight["dest_country"],
-                flight["dest_lat"],
-                flight["dest_lon"],
-                flight["departure_time"],
-                flight["arrival_time"],
-                flight["duration_min"],
-                flight["recorded_at"],
-            ),
-        )
+        row = conn.execute(
+            "SELECT 1 FROM flights WHERE tail = ? AND departure_time LIKE ? LIMIT 1",
+            (tail, f"{date}%"),
+        ).fetchone()
+    return row is not None
+
+
+def _insert_flight(conn, flight):
+    conn.execute(
+        """INSERT INTO flights
+           (callsign, tail, aircraft_type, icao_hex,
+            origin_icao, origin_name, origin_city, origin_region, origin_country,
+            origin_lat, origin_lon,
+            dest_icao, dest_name, dest_city, dest_region, dest_country,
+            dest_lat, dest_lon,
+            departure_time, arrival_time, duration_min, recorded_at, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            flight["callsign"],
+            flight.get("tail", ""),
+            flight["aircraft_type"],
+            flight.get("icao_hex", ""),
+            flight["origin_icao"],
+            flight.get("origin_name"),
+            flight.get("origin_city"),
+            flight.get("origin_region"),
+            flight.get("origin_country"),
+            flight.get("origin_lat"),
+            flight.get("origin_lon"),
+            flight["dest_icao"],
+            flight.get("dest_name"),
+            flight.get("dest_city"),
+            flight.get("dest_region"),
+            flight.get("dest_country"),
+            flight.get("dest_lat"),
+            flight.get("dest_lon"),
+            flight["departure_time"],
+            flight["arrival_time"],
+            flight["duration_min"],
+            flight["recorded_at"],
+            flight.get("source", "adsb"),
+        ),
+    )
+
+
+def save_flight(flight):
+    """Insert a flight unconditionally (used by adsb.lol poller)."""
+    with sqlite3.connect(DB_PATH) as conn:
+        _insert_flight(conn, flight)
         conn.commit()
+
+
+def save_flight_if_new(flight):
+    """Insert only if no existing record with same tail + departure date. Returns True if saved."""
+    if flight_exists(flight):
+        return False
+    with sqlite3.connect(DB_PATH) as conn:
+        _insert_flight(conn, flight)
+        conn.commit()
+    return True

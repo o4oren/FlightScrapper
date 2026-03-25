@@ -8,6 +8,7 @@ import os
 from datetime import datetime, timezone
 
 from airports import snap_to_airport
+import tails as tails_store
 from config import (
     AIRCRAFT_TYPE,
     BUFFER_PATH,
@@ -83,6 +84,11 @@ def process_poll(aircraft_list):
             continue
 
         seen_hexes.add(hex_id)
+
+        # Register new tail numbers as they are observed
+        if tail and tails_store.add_tail(tail):
+            print(f"  New tail discovered: {tail}")
+            tails_store.save_tails()
 
         if hex_id not in _active:
             # New aircraft — only track if it's on the ground or very low (not mid-join)
@@ -180,6 +186,7 @@ def process_poll(aircraft_list):
                     "arrival_time": arrival_time,
                     "duration_min": round(duration_min, 1),
                     "recorded_at": _now_iso(),
+                    "source": "adsb",
                 }
                 completed_flights.append(flight)
                 print(

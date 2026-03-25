@@ -38,6 +38,7 @@ htmlcov/
 *.db-wal
 buffer.json
 data/airports.csv
+data/tails.json
 
 # Logs
 *.log
