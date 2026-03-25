@@ -67,8 +67,9 @@ def _departure_date(flight):
 
 
 def flight_exists(flight):
-    """Return True if a flight with the same callsign, origin, dest, and departure date exists."""
+    """Return True if a flight with the same callsign, aircraft_type, origin, dest, and departure date exists."""
     callsign = flight.get("callsign", "")
+    aircraft_type = flight.get("aircraft_type", "")
     origin = flight.get("origin_icao", "")
     dest = flight.get("dest_icao", "")
     date = _departure_date(flight)
@@ -77,9 +78,9 @@ def flight_exists(flight):
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
             """SELECT 1 FROM flights
-               WHERE callsign = ? AND origin_icao = ? AND dest_icao = ?
+               WHERE callsign = ? AND aircraft_type = ? AND origin_icao = ? AND dest_icao = ?
                AND departure_time LIKE ? LIMIT 1""",
-            (callsign, origin, dest, f"{date}%"),
+            (callsign, aircraft_type, origin, dest, f"{date}%"),
         ).fetchone()
     return row is not None
 
@@ -132,7 +133,7 @@ def save_flight(flight):
 
 
 def save_flight_if_new(flight):
-    """Insert only if no existing record with same callsign + origin + dest + departure date. Returns True if saved."""
+    """Insert only if no existing record with same callsign + aircraft_type + origin + dest + departure date. Returns True if saved."""
     if flight_exists(flight):
         return False
     with sqlite3.connect(DB_PATH) as conn:
