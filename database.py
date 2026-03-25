@@ -29,9 +29,28 @@ CREATE TABLE IF NOT EXISTS flights (
 """
 
 
+MIGRATIONS = [
+    "ALTER TABLE flights ADD COLUMN origin_name TEXT",
+    "ALTER TABLE flights ADD COLUMN origin_city TEXT",
+    "ALTER TABLE flights ADD COLUMN origin_region TEXT",
+    "ALTER TABLE flights ADD COLUMN origin_country TEXT",
+    "ALTER TABLE flights ADD COLUMN dest_name TEXT",
+    "ALTER TABLE flights ADD COLUMN dest_city TEXT",
+    "ALTER TABLE flights ADD COLUMN dest_region TEXT",
+    "ALTER TABLE flights ADD COLUMN dest_country TEXT",
+]
+
+
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.executescript(SCHEMA)
+        # Apply migrations idempotently — SQLite raises on duplicate columns, so we ignore those errors
+        for sql in MIGRATIONS:
+            try:
+                conn.execute(sql)
+            except sqlite3.OperationalError:
+                pass
+        conn.commit()
 
 
 def save_flight(flight):
