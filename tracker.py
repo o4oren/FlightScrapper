@@ -40,6 +40,7 @@ def load_buffer():
         for state in data.values():
             state.setdefault("tail", "")
             state.setdefault("aircraft_type", "")
+            state.setdefault("max_alt", 0)
             state.setdefault("origin_name", None)
             state.setdefault("origin_city", None)
             state.setdefault("origin_region", None)
@@ -104,6 +105,7 @@ def process_poll(aircraft_list):
                 "last_lat": lat,
                 "last_lon": lon,
                 "last_alt": alt,
+                "max_alt": alt,
                 "airborne": False,
                 "origin_icao": None,
                 "origin_name": None,
@@ -147,6 +149,7 @@ def process_poll(aircraft_list):
         state["last_lat"] = lat
         state["last_lon"] = lon
         state["last_alt"] = alt
+        state["max_alt"] = max(state.get("max_alt", 0), alt)
 
     # Check for aircraft that have disappeared
     vanished = [h for h in list(_active) if h not in seen_hexes]
@@ -188,6 +191,8 @@ def process_poll(aircraft_list):
                     "departure_time": state["departure_time"],
                     "arrival_time": arrival_time,
                     "duration_min": round(duration_min, 1),
+                    "max_alt_ft": round(state.get("max_alt", 0), -3),
+                    "flightaware_url": f"https://www.flightaware.com/live/flight/{state['callsign']}" if state["callsign"] else None,
                     "recorded_at": _now_iso(),
                     "source": "adsb",
                 }

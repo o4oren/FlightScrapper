@@ -103,6 +103,8 @@ def fetch_flights_for_tail(tail):
             "departure_time": actual_off,
             "arrival_time": actual_on,
             "duration_min": round(duration_min, 1),
+            "max_alt_ft": None,
+            "flightaware_url": f"https://www.flightaware.com/live/flight/{(f.get('ident') or '').strip()}" if (f.get('ident') or '').strip() else None,
             "recorded_at": datetime.now(timezone.utc).isoformat(),
             "source": "flightaware",
         })
