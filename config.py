@@ -1,3 +1,5 @@
+import os
+
 # Filter configuration — edit these to track different aircraft/airlines
 # Fedex feeder operatiors: "BVN", "CPT", "IRO", "CFS", "MTN", "PCM", "WIG", "MAL", "AIG"
 # DHL feeder operatiors: "DHK", "DHX", "VEC", "TJN", "BOX", "JOS", "SNC", "BEZ", "SET"
@@ -21,7 +23,7 @@ SNAP_RADIUS_KM_FALLBACK = 10.0
 ADSB_API_URL = "https://api.adsb.lol/v2/type/{aircraft_type}"
 
 # FlightAware AeroAPI
-FLIGHTAWARE_API_KEY = ""  # Set your AeroAPI key here or via env var FLIGHTAWARE_API_KEY
+FLIGHTAWARE_API_KEY = f"{os.environ.get('FLIGHTAWARE_API_KEY')}"  # Set your AeroAPI key here or via env var FLIGHTAWARE_API_KEY
 FLIGHTAWARE_API_URL = "https://aeroapi.flightaware.com/aeroapi"
 FLIGHTAWARE_LOOKBACK_DAYS = 14       # How many days back to fetch on each batch run
 FLIGHTAWARE_BATCH_INTERVAL_HOURS = 24  # How often to run the FlightAware batch
