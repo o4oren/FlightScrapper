@@ -1,35 +1,78 @@
 # FlightScrapper
 
-Polls [adsb.lol](https://adsb.lol) for live ADS-B data and builds a local SQLite database of completed flights for a specific aircraft type and/or airline callsign prefix.
+Tracks cargo feeder flights by aircraft type and airline callsign, building a local SQLite database of completed flights with full origin/destination detail.
 
-Designed to run continuously on a free-tier cloud VM (Fly.io, Oracle Cloud, etc.) at zero ongoing cost.
+Uses two complementary data sources:
+- **[adsb.lol](https://adsb.lol)** — free live ADS-B feed, polled every 60 seconds, good coverage of the continental US and most major regions
+- **[FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/)** — optional enrichment, fetches 14 days of history per tail number weekly, fills gaps in ADS-B coverage (Caribbean, remote areas)
 
-## What it does
+Designed to run continuously on a free-tier cloud VM (Fly.io, Oracle Cloud, etc.) at near-zero cost.
 
-Every 60 seconds, FlightScrapper fetches all airborne aircraft of a configured type (default: Cessna 208 Caravan, `C208`) from the adsb.lol public API. It tracks each aircraft in memory, detects takeoff and landing events from altitude changes, and resolves the origin and destination airports by snapping the aircraft's position at those events to the nearest airport from the [OurAirports](https://ourairports.com/data/) database.
+---
+
+## How it works
+
+### Live ADS-B tracking (adsb.lol)
+
+Every 60 seconds, FlightScrapper fetches all airborne aircraft matching the configured type(s) (e.g. `C208`, `C408`) from the adsb.lol API, then filters by callsign prefix (e.g. `FDX`, `DHX`).
+
+Each aircraft is tracked in memory. When an aircraft's altitude crosses 500ft upward, a takeoff is recorded and its position is snapped to the nearest airport in the [OurAirports](https://ourairports.com/data/) database. When the aircraft disappears from the feed below 3000ft for 5+ minutes, a landing is recorded and its last known position is snapped to the nearest airport.
 
 A flight record is written to the database **only** when both origin and destination airports are successfully identified. Partial flights, mid-flight detections, and unresolvable positions are silently discarded.
 
-### Tracked fields per flight
+Any new tail number observed flying under a matching callsign prefix is added to `data/tails.json` for FlightAware enrichment.
+
+### FlightAware batch enrichment
+
+Once every 24 hours, FlightScrapper runs a batch job against the FlightAware AeroAPI. For each known tail number that has not been successfully fetched in the last **7 days**, it calls `GET /flights/{tail}` to retrieve up to 14 days of completed flight history with authoritative origin, destination, and times.
+
+Each returned flight is inserted into the database only if no record with the same tail number and departure date already exists (deduplication). On success, the tail's last-fetch timestamp is updated — suppressing it from the next 7 days of batches.
+
+This makes FlightAware coverage additive: it fills in flights that ADS-B missed (Caribbean routes, coverage gaps) without duplicating what adsb.lol already captured.
+
+FlightAware enrichment is **optional** — if no API key is configured the system runs on adsb.lol alone.
+
+### Origin/destination resolution
+
+Airport snapping uses the OurAirports CC0 dataset (~25,000 airports with ICAO codes). At takeoff/landing, the aircraft's position is matched to the nearest airport within 3km (expanding to 10km if nothing is found). If no airport is found within 10km, the flight is discarded.
+
+For scheduled cargo feeder operations this is reliable — these aircraft always depart from and arrive at real airports.
+
+---
+
+## Tracked fields per flight
 
 | Field | Description |
 |---|---|
 | `callsign` | Flight callsign (e.g. `FDX1234`) |
+| `tail` | Aircraft registration / tail number (e.g. `N208FE`) |
 | `aircraft_type` | ICAO type designator (e.g. `C208`) |
-| `icao_hex` | Aircraft Mode-S transponder hex code |
+| `icao_hex` | Mode-S transponder hex code (adsb source only) |
 | `origin_icao` | Departure airport ICAO code |
-| `dest_icao` | Arrival airport ICAO code |
+| `origin_name` | Departure airport name |
+| `origin_city` | Departure city |
+| `origin_region` | Departure state/province |
+| `origin_country` | Departure country code |
 | `origin_lat` / `origin_lon` | Departure position coordinates |
+| `dest_icao` | Arrival airport ICAO code |
+| `dest_name` | Arrival airport name |
+| `dest_city` | Arrival city |
+| `dest_region` | Arrival state/province |
+| `dest_country` | Arrival country code |
 | `dest_lat` / `dest_lon` | Arrival position coordinates |
 | `departure_time` | Takeoff timestamp (UTC ISO 8601) |
 | `arrival_time` | Landing timestamp (UTC ISO 8601) |
 | `duration_min` | Flight duration in minutes |
 | `recorded_at` | When the record was written |
+| `source` | `adsb` or `flightaware` |
+
+---
 
 ## Requirements
 
 - Python 3.9+
-- Internet access (adsb.lol API + OurAirports CSV on first run)
+- Internet access (adsb.lol + OurAirports CSV on first run)
+- FlightAware AeroAPI key (optional, for Caribbean/gap coverage)
 
 ## Installation
 
@@ -43,87 +86,126 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Configuration
+
+All settings are in `config.py`:
+
+### Filtering
+
+| Setting | Description |
+|---|---|
+| `AIRCRAFT_TYPES` | List of ICAO type designators to track (e.g. `["C208", "C408"]`) |
+| `CALLSIGN_PREFIXES` | Only track callsigns starting with these prefixes. Empty list = all callsigns |
+| `KNOWN_TAILS` | Seed list of tail numbers to include in FlightAware batches from the start |
+
+### Polling
+
+| Setting | Default | Description |
+|---|---|---|
+| `POLL_INTERVAL_SECONDS` | `60` | How often to poll adsb.lol |
+| `POLL_JITTER_SECONDS` | `10` | Random ± jitter added to each poll interval |
+
+### Flight detection
+
+| Setting | Default | Description |
+|---|---|---|
+| `TAKEOFF_ALTITUDE_FT` | `500` | Altitude threshold for takeoff detection |
+| `LANDING_ALTITUDE_FT` | `3000` | Maximum altitude when disappearing to count as a landing |
+| `LANDING_TIMEOUT_SECONDS` | `300` | Seconds unseen before declaring an aircraft landed |
+| `SNAP_RADIUS_KM_PRIMARY` | `3.0` | Primary airport snap radius in km |
+| `SNAP_RADIUS_KM_FALLBACK` | `10.0` | Fallback snap radius if nothing found within primary |
+
+### FlightAware
+
+| Setting | Default | Description |
+|---|---|---|
+| `FLIGHTAWARE_API_KEY` | `""` | AeroAPI key — or set env var `FLIGHTAWARE_API_KEY` |
+| `FLIGHTAWARE_LOOKBACK_DAYS` | `14` | Days of history to fetch per tail number |
+| `FLIGHTAWARE_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for a refresh |
+
+FlightAware fetches are suppressed per tail for 7 days after a successful fetch. The suppression window is set by `FA_SUPPRESS_DAYS` in `tails.py`.
+
 ## Running
 
 ```bash
+# Optional: set FlightAware API key
+export FLIGHTAWARE_API_KEY=your_key_here
+
 python main.py
 ```
 
 On first run, the OurAirports airport database (~8MB CSV) is downloaded to `data/airports.csv`. This only happens once.
 
-The poller then starts. Output looks like:
+Example output:
 
 ```
 FlightScrapper starting.
-  Aircraft type : C208
-  Callsign filter: ['FDX', 'DHL']
+  Aircraft types: C208, C408
+  Callsign filter: ['FDX', 'DHX', ...]
   Poll interval : 60s ± 10s
+  FlightAware  : enabled (batch every 24h)
 Loaded 25431 airports.
-Resumed 0 in-flight aircraft from buffer.
-[poll #1] 3 aircraft matching filters
-[poll #2] 3 aircraft matching filters
-  Takeoff: FDX1234 from KMEM
-[poll #47] 4 aircraft matching filters
-  Landed:  FDX1234 KMEM->KBNA (42min)
+Loaded 12 known tail numbers.
+Resumed 3 in-flight aircraft from buffer.
+[2026-03-25 14:00:01 UTC] poll #1 — 5 aircraft matching filters
+  New tail discovered: N208FE
+  Takeoff: FDX1234 from KMEM (Memphis)
+[2026-03-25 14:41:03 UTC] poll #42 — 4 aircraft matching filters
+  Landed:  FDX1234 KMEM (Memphis) -> KBNA (Nashville) (41min)
   Saved: FDX1234 KMEM->KBNA
+[FlightAware] Starting batch for 8/12 tail(s) due for refresh...
+  [FA] Saved: WIG001 TJSJ->TISX (2026-03-24)
+  [FA] N208FE (1/8): 14 fetched, 9 saved, 5 already known
+[FlightAware] Batch complete — 23 saved, 18 duplicates skipped.
 ```
 
 Stop with `Ctrl+C` — active flights are saved to `buffer.json` and resumed on next start.
-
-## Configuration
-
-All settings are in `config.py`:
-
-| Setting | Default | Description |
-|---|---|---|
-| `AIRCRAFT_TYPE` | `"C208"` | ICAO aircraft type designator to track |
-| `CALLSIGN_PREFIXES` | `["FDX", "DHL"]` | Only track callsigns starting with these. Empty list = all callsigns |
-| `POLL_INTERVAL_SECONDS` | `60` | How often to poll adsb.lol |
-| `POLL_JITTER_SECONDS` | `10` | Random ± jitter added to each poll interval |
-| `TAKEOFF_ALTITUDE_FT` | `500` | Altitude threshold for takeoff detection |
-| `LANDING_ALTITUDE_FT` | `3000` | Maximum altitude when disappearing to count as landing |
-| `LANDING_TIMEOUT_SECONDS` | `300` | Seconds unseen before declaring an aircraft landed |
-| `SNAP_RADIUS_KM_PRIMARY` | `3.0` | Primary airport snap radius in km |
-| `SNAP_RADIUS_KM_FALLBACK` | `10.0` | Fallback snap radius if nothing found within primary |
 
 ## Data files
 
 | File | Description |
 |---|---|
 | `flights.db` | SQLite database of completed flights |
-| `buffer.json` | In-memory tracker state, persisted for crash resilience |
+| `buffer.json` | In-flight tracker state, persisted for crash resilience |
 | `data/airports.csv` | OurAirports database, downloaded on first run |
+| `data/tails.json` | Known tail numbers with last FlightAware fetch timestamps |
 
-Neither `flights.db` nor `buffer.json` are committed to git.
+None of these are committed to git.
 
 ## Querying the data
 
-The database is a standard SQLite file. Query it with any SQLite client, or use [Datasette](https://datasette.io/) for a browser-based interface with built-in CSV export:
+Use any SQLite client, or [Datasette](https://datasette.io/) for a browser UI with built-in CSV export:
 
 ```bash
 pip install datasette
 datasette flights.db
 ```
 
-Then open `http://localhost:8001` in your browser.
+Then open `http://localhost:8001`.
 
-Example SQL queries:
+Example queries:
 
 ```sql
 -- All flights, newest first
-SELECT * FROM flights ORDER BY departure_time DESC;
+SELECT callsign, tail, aircraft_type, origin_icao, origin_city, dest_icao, dest_city,
+       departure_time, duration_min, source
+FROM flights ORDER BY departure_time DESC;
 
--- Flights between two airports
-SELECT * FROM flights WHERE origin_icao = 'KMEM' AND dest_icao = 'KBNA';
+-- Caribbean routes only
+SELECT * FROM flights WHERE origin_country = 'PR' OR dest_country = 'PR'
+ORDER BY departure_time DESC;
 
 -- Most common routes
-SELECT origin_icao, dest_icao, COUNT(*) as count
+SELECT origin_icao, origin_city, dest_icao, dest_city, COUNT(*) as count
 FROM flights
 GROUP BY origin_icao, dest_icao
 ORDER BY count DESC;
 
--- Average flight duration per route
-SELECT origin_icao, dest_icao, ROUND(AVG(duration_min)) as avg_min
+-- Flights by source
+SELECT source, COUNT(*) as count FROM flights GROUP BY source;
+
+-- Average duration per route
+SELECT origin_icao, dest_icao, ROUND(AVG(duration_min)) as avg_min, COUNT(*) as flights
 FROM flights
 GROUP BY origin_icao, dest_icao
 ORDER BY avg_min DESC;
@@ -131,15 +213,18 @@ ORDER BY avg_min DESC;
 
 ## Data sources
 
-- **Live ADS-B data:** [adsb.lol](https://adsb.lol) — free, no API key required, personal/non-commercial use
-- **Airport database:** [OurAirports](https://ourairports.com/data/) — CC0 public domain
+| Source | Use | Cost | Key required |
+|---|---|---|---|
+| [adsb.lol](https://adsb.lol) | Live polling | Free | No |
+| [OurAirports](https://ourairports.com/data/) | Airport database | Free (CC0) | No |
+| [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) | Historical enrichment | $5/month free credit | Yes |
 
 ## Limitations
 
-- Flights already in progress when the poller starts are discarded (no mid-join recovery)
-- ADS-B coverage is incomplete at low altitudes in rural areas — short flights may be missed
-- Origin/destination is inferred from position data, not from filed flight plans
+- Flights already airborne when the poller starts are discarded (no mid-join recovery)
+- ADS-B coverage is incomplete at low altitudes in rural areas and the Caribbean — FlightAware enrichment mitigates this
 - adsb.lol may require an API key in future (see their documentation)
+- FlightAware free tier provides ~$5/month credit; at ~$0.002/call this covers roughly 2,500 tail lookups/month
 
 ## Deployment
 
@@ -152,4 +237,10 @@ fly volumes create flightscrapper_data --size 1
 fly deploy
 ```
 
-Ensure the volume is mounted at `/data` and update `DB_PATH`, `BUFFER_PATH`, and `AIRPORTS_CSV_PATH` in `config.py` to use `/data/` as the base directory when deploying.
+Ensure the persistent volume is mounted at `/data` and set `DB_PATH`, `BUFFER_PATH`, `AIRPORTS_CSV_PATH`, and `TAILS_PATH` in `config.py` to use `/data/` as the base directory.
+
+Set the API key as a Fly.io secret:
+
+```bash
+fly secrets set FLIGHTAWARE_API_KEY=your_key_here
+```
