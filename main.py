@@ -36,7 +36,8 @@ def main():
     print(f"  Callsign filter: {CALLSIGN_PREFIXES or 'all'}")
     print(f"  Poll interval : {POLL_INTERVAL_SECONDS}s ± {POLL_JITTER_SECONDS}s")
 
-    fa_enabled = bool(os.environ.get("FLIGHTAWARE_API_KEY") or FLIGHTAWARE_API_KEY)
+    _fa_key = os.environ.get("FLIGHTAWARE_API_KEY") or FLIGHTAWARE_API_KEY
+    fa_enabled = bool(_fa_key and _fa_key != "None")
     print(f"  FlightAware  : {'enabled (batch every ' + str(FLIGHTAWARE_BATCH_INTERVAL_HOURS) + 'h)' if fa_enabled else 'disabled (no API key)'}")
 
     airports.load_airports()

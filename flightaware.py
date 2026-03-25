@@ -20,7 +20,9 @@ SESSION = requests.Session()
 
 
 def _api_key():
-    return os.environ.get("FLIGHTAWARE_API_KEY") or FLIGHTAWARE_API_KEY
+    # Always prefer the live env var; fall back to config only if it's not "None" (the f-string default)
+    key = os.environ.get("FLIGHTAWARE_API_KEY") or FLIGHTAWARE_API_KEY
+    return key if key and key != "None" else None
 
 
 def _headers():
