@@ -200,8 +200,18 @@ def _insert_flight(conn, flight):
     )
 
 
+def _is_valid_icao(code):
+    """Return True if code looks like a real ICAO airport code (4 letters, no digits in first 3 chars)."""
+    if not code or len(code) < 3:
+        return False
+    return all(c.isalpha() for c in code[:3])
+
+
 def save_flight(flight):
     """Insert flight, or merge into existing record if duplicate."""
+    if not _is_valid_icao(flight.get("origin_icao", "")) or \
+       not _is_valid_icao(flight.get("dest_icao", "")):
+        return  # silently discard private/non-standard airport codes
     with sqlite3.connect(DB_PATH) as conn:
         existing_id, exact_match = _find_existing(conn, flight)
         if existing_id:
@@ -212,7 +222,10 @@ def save_flight(flight):
 
 
 def save_flight_if_new(flight):
-    """Insert flight if new, or merge into existing record. Returns True if inserted, False if merged."""
+    """Insert flight if new, or merge into existing record. Returns True if inserted, False if merged/discarded."""
+    if not _is_valid_icao(flight.get("origin_icao", "")) or \
+       not _is_valid_icao(flight.get("dest_icao", "")):
+        return False  # silently discard private/non-standard airport codes
     with sqlite3.connect(DB_PATH) as conn:
         existing_id, exact_match = _find_existing(conn, flight)
         if existing_id:
