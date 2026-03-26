@@ -53,8 +53,8 @@ def _parse_airport(ap):
 
 
 def _parse_time(time_obj):
-    """Return UTC ISO string from a time object, preferring runwayTime > revisedTime > scheduledTime."""
-    for key in ("runwayTime", "revisedTime", "scheduledTime"):
+    """Return UTC ISO string from a time object, preferring runwayTime > revisedTime > predictedTime > scheduledTime."""
+    for key in ("runwayTime", "revisedTime", "predictedTime", "scheduledTime"):
         val = (time_obj or {}).get(key, {}).get("utc")
         if val:
             # Normalise "2026-03-21 01:18Z" → "2026-03-21T01:18:00+00:00"
