@@ -40,6 +40,10 @@ buffer.json
 data/airports.csv
 data/tails.json
 
+# Schedule output files
+schedule.html
+schedule.csv
+
 # Logs
 *.log
 
