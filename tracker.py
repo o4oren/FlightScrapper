@@ -88,10 +88,19 @@ def process_poll(aircraft_list):
 
         seen_hexes.add(hex_id)
 
-        # Register new tail numbers as they are observed
+        # Register new tail numbers as they are observed and fetch history immediately
         if tail and tails_store.add_tail(tail):
-            print(f"  New tail discovered: {tail}")
+            print(f"  New tail discovered: {tail} — fetching history...")
             tails_store.save_tails()
+            try:
+                import aerodatabox
+                import database
+                flights = aerodatabox.fetch_flights_for_tail(tail)
+                new_count = sum(1 for f in flights if database.save_flight_if_new(f))
+                print(f"  History for {tail}: {len(flights)} fetched, {new_count} saved")
+                tails_store.record_fa_fetch(tail)
+            except Exception as e:
+                print(f"  History fetch failed for {tail}: {e}")
 
         if hex_id not in _active:
             # New aircraft — discard if clearly mid-flight
