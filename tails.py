@@ -16,8 +16,7 @@ _registry = {}  # { tail: last_fa_fetch_iso or None }
 
 
 def load_tails():
-    for tail in KNOWN_TAILS:
-        _registry.setdefault(tail, None)
+    # Load tails.json first so existing timestamps are preserved
     if os.path.exists(TAILS_PATH):
         with open(TAILS_PATH) as f:
             data = json.load(f)
@@ -27,7 +26,10 @@ def load_tails():
                 _registry.setdefault(tail, None)
         else:
             for tail, last_fetch in data.items():
-                _registry.setdefault(tail, last_fetch)
+                _registry[tail] = last_fetch
+    # Seed KNOWN_TAILS after — setdefault won't overwrite existing timestamps
+    for tail in KNOWN_TAILS:
+        _registry.setdefault(tail, None)
     print(f"Loaded {len(_registry)} known tail numbers.")
 
 
