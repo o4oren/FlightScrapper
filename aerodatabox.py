@@ -87,13 +87,16 @@ def fetch_flights_for_tail(tail):
 
     flights = []
     for f in data:
-        # Only store completed flights with known destination
-        if f.get("status") != "Arrived":
+        # Skip flights still genuinely in progress
+        if f.get("status") in ("EnRoute", "Unknown"):
             continue
 
         dep_time = _parse_time(f.get("departure"))
         arr_time = _parse_time(f.get("arrival"))
-        if not dep_time or not arr_time:
+        # Require both actual runway times — this is the real completed-flight indicator
+        dep_has_runway = bool((f.get("departure") or {}).get("runwayTime"))
+        arr_has_runway = bool((f.get("arrival") or {}).get("runwayTime"))
+        if not dep_time or not arr_time or not dep_has_runway or not arr_has_runway:
             continue
 
         origin_icao, origin_name, origin_city, origin_country, origin_lat, origin_lon = \
@@ -179,11 +182,7 @@ def run_batch():
                     skipped += 1
             print(f"  [ADB] {tail} ({i}/{total}): {len(flights)} fetched, "
                   f"{tail_saved} saved, {tail_skipped} already known")
-            if len(flights) == 0:
-                print(f"  [ADB] No flights found for {tail} — removing from tails")
-                tails_store.remove_tail(tail)
-            else:
-                tails_store.record_fa_fetch(tail)
+            tails_store.record_fa_fetch(tail)
         except ValueError as e:
             # Empty response body — AeroDataBox has no data for this tail, remove it
             print(f"  [ADB] No data for {tail} (removing from tails): {e}")
