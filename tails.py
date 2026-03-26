@@ -52,6 +52,13 @@ def record_fa_fetch(tail):
         save_tails()
 
 
+def remove_tail(tail):
+    """Remove a tail number permanently (e.g. no data available from API)."""
+    if tail in _registry:
+        del _registry[tail]
+        save_tails()
+
+
 def get_tails():
     return set(_registry.keys())
 

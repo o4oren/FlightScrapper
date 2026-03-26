@@ -180,6 +180,10 @@ def run_batch():
             print(f"  [ADB] {tail} ({i}/{total}): {len(flights)} fetched, "
                   f"{tail_saved} saved, {tail_skipped} already known")
             tails_store.record_fa_fetch(tail)
+        except ValueError as e:
+            # Empty response body — AeroDataBox has no data for this tail, remove it
+            print(f"  [ADB] No data for {tail} (removing from tails): {e}")
+            tails_store.remove_tail(tail)
         except Exception as e:
             print(f"  [ADB] Error fetching {tail}: {e}")
         time.sleep(2)
