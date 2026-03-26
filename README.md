@@ -229,14 +229,32 @@ ORDER BY avg_min DESC;
 |---|---|---|---|
 | [adsb.lol](https://adsb.lol) | Live polling | Free | No |
 | [OurAirports](https://ourairports.com/data/) | Airport database | Free (CC0) | No |
-| [AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) | Historical enrichment | free (600 api units) or $5/month (6,000 api units - 1,000 calls) | Yes (RapidAPI key) |
+| [AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) | Historical enrichment | Free (600 units) or $5/month (6,000 units) | Yes (RapidAPI key) |
+
+### Why these sources?
+
+**adsb.lol for live polling:**
+The key requirement was a native filter by ICAO aircraft type (e.g. `C208`) so we only receive relevant aircraft without downloading the entire global feed. adsb.lol is the only free community ADS-B source with a `/v2/type/{aircraft_type}` endpoint. Alternatives considered:
+
+- **adsb.fi** — identical data quality and better-documented use policy, but no type filter endpoint; only supports lookup by hex, callsign, registration, or lat/lon radius
+- **ADSBexchange** — no public API; would require scraping their web UI
+- **airplanes.live** — no documented use policy for automated polling
+- **OpenSky Network** — no native type filter; 400 API credits/day on free tier; historical data only via research account registration
+
+**AeroDataBox for historical enrichment:**
+Used as a weekly batch to backfill flights missed by live polling (Caribbean coverage gaps, poller restarts) and to enrich records with authoritative origin/destination data. Alternatives considered:
+
+- **FlightAware AeroAPI** — strong coverage including Caribbean via their own receiver network; can query history by tail number; would be the best single source if used for both live and historical. The free personal tier provides $5/month credit (~2,500 calls), but at a 60-second poll interval that only covers ~41 hours of continuous live polling before exhausting the credit. Viable for weekly batch enrichment but not for the live polling role.
+- **FlightRadar24 API** — no free tier; $9/month minimum with no trial for production use
+- **Aviationstack** — 100 calls/month free tier is insufficient; paid plans start at $49.99/month
+- **AeroDataBox** — $5/month for 3,000 calls fits the weekly batch use case well; native registration-based history lookup with good Caribbean coverage
 
 ## Limitations
 
-- Flights already airborne when the poller starts are discarded (no mid-join recovery)
-- ADS-B coverage is incomplete at low altitudes in rural areas and the Caribbean — FlightAware enrichment mitigates this
+- Flights already airborne when the poller starts above 2000ft are discarded (no mid-join recovery)
+- ADS-B coverage is incomplete at low altitudes in rural areas and the Caribbean — AeroDataBox batch enrichment mitigates this
 - adsb.lol may require an API key in future (see their documentation)
-- FlightAware free tier provides ~$5/month credit; at ~$0.002/call this covers roughly 2,500 tail lookups/month
+- AeroDataBox free tier (600 units/month) may be insufficient for large tail lists; the $5/month plan (6,000 units) covers ~1,000 history calls/month
 
 ## Deployment
 
