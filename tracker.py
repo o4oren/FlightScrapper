@@ -95,7 +95,9 @@ def process_poll(aircraft_list):
             try:
                 import aerodatabox
                 import database
+                import time
                 flights = aerodatabox.fetch_flights_for_tail(tail)
+                time.sleep(2)
                 new_count = sum(1 for f in flights if database.save_flight_if_new(f))
                 print(f"  History for {tail}: {len(flights)} fetched, {new_count} saved")
                 tails_store.record_fa_fetch(tail)
