@@ -93,10 +93,9 @@ def fetch_flights_for_tail(tail):
 
         dep_time = _parse_time(f.get("departure"))
         arr_time = _parse_time(f.get("arrival"))
-        # Require both actual runway times — this is the real completed-flight indicator
+        # Require actual departure runway time + any arrival time
         dep_has_runway = bool((f.get("departure") or {}).get("runwayTime"))
-        arr_has_runway = bool((f.get("arrival") or {}).get("runwayTime"))
-        if not dep_time or not arr_time or not dep_has_runway or not arr_has_runway:
+        if not dep_time or not arr_time or not dep_has_runway:
             continue
 
         origin_icao, origin_name, origin_city, origin_country, origin_lat, origin_lon = \
