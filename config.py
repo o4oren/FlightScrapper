@@ -23,15 +23,14 @@ SNAP_RADIUS_KM_FALLBACK = 10.0
 # Data source
 ADSB_API_URL = "https://api.adsb.lol/v2/type/{aircraft_type}"
 
-# FlightAware AeroAPI
-FLIGHTAWARE_API_KEY = f"{os.environ.get('FLIGHTAWARE_API_KEY')}"  # Set your AeroAPI key here or via env var FLIGHTAWARE_API_KEY
-FLIGHTAWARE_API_URL = "https://aeroapi.flightaware.com/aeroapi"
-FLIGHTAWARE_LOOKBACK_DAYS = 14       # How many days back to fetch on each batch run
-FLIGHTAWARE_BATCH_INTERVAL_HOURS = 24  # How often to run the FlightAware batch
+# AeroDataBox API (via RapidAPI) — set env var AERODATABOX_API_KEY or fill in below
+AERODATABOX_API_KEY = f"{os.environ.get('AERODATABOX_API_KEY', '')}"
+AERODATABOX_LOOKBACK_DAYS = 7        # Free tier supports 7-day history per request
+AERODATABOX_BATCH_INTERVAL_HOURS = 24  # How often to check for tails due for a refresh
 
 # Known tail numbers — seed list, runtime additions saved to tails.json
 # adsb.lol will add new tails automatically as they are observed
-KNOWN_TAILS = ["N962HL", "N960HL", "N961HL", "N963HL", "N965HL","N920HL", "N910HL"]
+KNOWN_TAILS = ["N962HL", "N960HL", "N961HL", "N963HL", "N965HL","N920HL", "N910HL", "M763FX","N765FX", "N851FX", "N934FX", "N907FX"]
 
 # Paths
 AIRPORTS_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
