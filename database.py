@@ -66,23 +66,47 @@ def _departure_date(flight):
     return (flight.get("departure_time") or "")[:10]
 
 
-def flight_exists(flight):
-    """Return True if a flight with the same callsign, aircraft_type, origin, dest, and departure date exists."""
+def _find_existing(conn, flight):
+    """Return the id of a matching flight record, or None."""
     callsign = flight.get("callsign", "")
     aircraft_type = flight.get("aircraft_type", "")
     origin = flight.get("origin_icao", "")
     dest = flight.get("dest_icao", "")
     date = _departure_date(flight)
     if not callsign or not origin or not dest or not date:
-        return False
-    with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute(
-            """SELECT 1 FROM flights
-               WHERE callsign = ? AND aircraft_type = ? AND origin_icao = ? AND dest_icao = ?
-               AND departure_time LIKE ? LIMIT 1""",
-            (callsign, aircraft_type, origin, dest, f"{date}%"),
-        ).fetchone()
-    return row is not None
+        return None
+    row = conn.execute(
+        """SELECT id FROM flights
+           WHERE callsign = ? AND aircraft_type = ? AND origin_icao = ? AND dest_icao = ?
+           AND departure_time LIKE ? LIMIT 1""",
+        (callsign, aircraft_type, origin, dest, f"{date}%"),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _merge_flight(conn, existing_id, flight):
+    """Update NULL fields in an existing record with non-null values from the incoming flight."""
+    # Fields that can be merged from either source
+    mergeable = [
+        ("tail", flight.get("tail") or None),
+        ("icao_hex", flight.get("icao_hex") or None),
+        ("max_alt_ft", flight.get("max_alt_ft")),
+        ("flightaware_url", flight.get("flightaware_url") or None),
+        ("origin_name", flight.get("origin_name") or None),
+        ("origin_city", flight.get("origin_city") or None),
+        ("origin_region", flight.get("origin_region") or None),
+        ("origin_country", flight.get("origin_country") or None),
+        ("dest_name", flight.get("dest_name") or None),
+        ("dest_city", flight.get("dest_city") or None),
+        ("dest_region", flight.get("dest_region") or None),
+        ("dest_country", flight.get("dest_country") or None),
+    ]
+    updates = [(col, val) for col, val in mergeable if val is not None]
+    if not updates:
+        return
+    set_clause = ", ".join(f"{col} = COALESCE({col}, ?)" for col, _ in updates)
+    values = [val for _, val in updates]
+    conn.execute(f"UPDATE flights SET {set_clause} WHERE id = ?", values + [existing_id])
 
 
 def _insert_flight(conn, flight):
@@ -126,17 +150,24 @@ def _insert_flight(conn, flight):
 
 
 def save_flight(flight):
-    """Insert a flight unconditionally (used by adsb.lol poller)."""
+    """Insert flight, or merge into existing record if duplicate."""
     with sqlite3.connect(DB_PATH) as conn:
-        _insert_flight(conn, flight)
+        existing_id = _find_existing(conn, flight)
+        if existing_id:
+            _merge_flight(conn, existing_id, flight)
+        else:
+            _insert_flight(conn, flight)
         conn.commit()
 
 
 def save_flight_if_new(flight):
-    """Insert only if no existing record with same callsign + aircraft_type + origin + dest + departure date. Returns True if saved."""
-    if flight_exists(flight):
-        return False
+    """Insert flight if new, or merge into existing record. Returns True if inserted, False if merged."""
     with sqlite3.connect(DB_PATH) as conn:
+        existing_id = _find_existing(conn, flight)
+        if existing_id:
+            _merge_flight(conn, existing_id, flight)
+            conn.commit()
+            return False
         _insert_flight(conn, flight)
         conn.commit()
     return True
