@@ -1,10 +1,10 @@
 # FlightScrapper
 
-Tracks cargo feeder flights by aircraft type and airline callsign, building a local SQLite database of completed flights with full origin/destination detail.
+A generic flight tracking utility that builds a local SQLite database of completed flights, filtered by any combination of aircraft types and airline callsign prefixes. Configured out of the box for FedEx and DHL C208/C408 feeder operations, but works for any operator or aircraft type.
 
 Uses two complementary data sources:
 - **[adsb.lol](https://adsb.lol)** — free live ADS-B feed, polled every 60 seconds, good coverage of the continental US and most major regions
-- **[FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/)** — optional enrichment, fetches 14 days of history per tail number weekly, fills gaps in ADS-B coverage (Caribbean, remote areas)
+- **[AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox)** — optional enrichment, fetches 7 days of history per tail number weekly, fills gaps in ADS-B coverage (Caribbean, remote areas)
 
 Designed to run continuously on a free-tier cloud VM (Fly.io, Oracle Cloud, etc.) at near-zero cost.
 
