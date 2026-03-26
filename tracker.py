@@ -101,10 +101,11 @@ def process_poll(aircraft_list):
                 new_count = sum(1 for f in flights if database.save_flight_if_new(f))
                 print(f"  History for {tail}: {len(flights)} fetched, {new_count} saved")
                 tails_store.record_fa_fetch(tail)
-            except ValueError as e:
-                # Empty response — AeroDataBox has no data for this tail, remove it
-                print(f"  No history data for {tail} (removing from tails): {e}")
-                tails_store.remove_tail(tail)
+            except ValueError:
+                # Empty response — AeroDataBox has no data for this tail
+                # Keep for live adsb.lol tracking, suppress for 7 days
+                print(f"  No AeroDataBox coverage for {tail} — suppressing for 7 days")
+                tails_store.record_fa_fetch(tail)
             except Exception as e:
                 print(f"  History fetch failed for {tail}: {e}")
 

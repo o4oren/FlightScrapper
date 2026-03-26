@@ -185,9 +185,10 @@ def run_batch():
                   f"{tail_saved} saved, {tail_skipped} already known")
             tails_store.record_fa_fetch(tail)
         except ValueError as e:
-            # Empty response body — AeroDataBox has no data for this tail, remove it
-            print(f"  [ADB] No data for {tail} (removing from tails): {e}")
-            tails_store.remove_tail(tail)
+            # Empty response body — AeroDataBox has no data for this tail
+            # Keep the tail for live adsb.lol tracking, but suppress for 7 days
+            print(f"  [ADB] No data for {tail} (no AeroDataBox coverage — suppressing for 7 days)")
+            tails_store.record_fa_fetch(tail)
         except Exception as e:
             print(f"  [ADB] Error fetching {tail}: {e}")
         time.sleep(2)
