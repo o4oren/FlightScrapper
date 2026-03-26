@@ -30,7 +30,7 @@ AERODATABOX_BATCH_INTERVAL_HOURS = 24  # How often to check for tails due for a 
 
 # Known tail numbers — seed list, runtime additions saved to tails.json
 # adsb.lol will add new tails automatically as they are observed
-KNOWN_TAILS = ["N962HL", "N960HL", "N961HL", "N963HL", "N965HL", "N920HL", "N910HL", "N763FE", "N765FE", "N851FE", "N934FE", "N907FX"]
+KNOWN_TAILS = ["N962HL", "N960HL", "N961HL", "N963HL"]
 
 # Paths
 AIRPORTS_CSV_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
