@@ -55,21 +55,56 @@ def load_airports():
                 "city": row.get("municipality", ""),
                 "region": region,
                 "country": row.get("iso_country", ""),
+                "type": row["type"],
             })
     print(f"Loaded {len(_airports)} airports.")
 
 
 def snap_to_airport(lat, lon):
-    """Return (airport_dict, distance_km) for nearest airport, or (None, None) if outside fallback radius."""
+    """
+    Return (airport_dict, distance_km) for best matching airport within fallback radius,
+    or (None, None) if nothing found.
+
+    Priority rules (within the search radius):
+    1. A small airport within 0.5km always wins — aircraft is essentially on top of it.
+    2. Otherwise prefer medium/large airports over small ones.
+    3. Within the same tier, prefer the closest.
+    """
+    SMALL_OVERRIDE_KM = 0.5
+
     best_ap = None
     best_dist = float("inf")
+    best_large_medium_ap = None
+    best_large_medium_dist = float("inf")
+
     for ap in _airports:
         d = _haversine_km(lat, lon, ap["lat"], ap["lon"])
+        if d > SNAP_RADIUS_KM_FALLBACK:
+            continue
         if d < best_dist:
             best_dist = d
             best_ap = ap
-    if best_ap and best_dist <= SNAP_RADIUS_KM_PRIMARY:
+        if ap["type"] in ("medium_airport", "large_airport") and d < best_large_medium_dist:
+            best_large_medium_dist = d
+            best_large_medium_ap = ap
+
+    if not best_ap:
+        return None, None
+
+    # Rule 1: small airport within 0.5km — use it regardless
+    if best_dist <= SMALL_OVERRIDE_KM:
         return best_ap, best_dist
-    if best_ap and best_dist <= SNAP_RADIUS_KM_FALLBACK:
+
+    # Rule 2: prefer medium/large if one exists within the radius
+    if best_large_medium_ap:
+        return best_large_medium_ap, best_large_medium_dist
+
+    # Rule 3: fall back to nearest small airport if within primary radius
+    if best_dist <= SNAP_RADIUS_KM_PRIMARY:
         return best_ap, best_dist
+
+    # Rule 4: fallback radius — only medium/large
+    if best_large_medium_ap and best_large_medium_dist <= SNAP_RADIUS_KM_FALLBACK:
+        return best_large_medium_ap, best_large_medium_dist
+
     return None, None
