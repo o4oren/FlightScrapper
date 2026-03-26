@@ -118,22 +118,33 @@ All settings are in `config.py`:
 | `SNAP_RADIUS_KM_PRIMARY` | `3.0` | Primary airport snap radius in km |
 | `SNAP_RADIUS_KM_FALLBACK` | `10.0` | Fallback snap radius if nothing found within primary |
 
-### FlightAware
+### AeroDataBox
 
 | Setting | Default | Description |
 |---|---|---|
-| `FLIGHTAWARE_API_KEY` | `""` | AeroAPI key — or set env var `FLIGHTAWARE_API_KEY` |
-| `FLIGHTAWARE_LOOKBACK_DAYS` | `14` | Days of history to fetch per tail number |
-| `FLIGHTAWARE_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for a refresh |
+| `AERODATABOX_API_KEY` | `""` | RapidAPI key — or set env var `AERODATABOX_API_KEY` |
+| `AERODATABOX_LOOKBACK_DAYS` | `7` | Days of history to fetch per tail number |
+| `AERODATABOX_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for a refresh |
 
-FlightAware fetches are suppressed per tail for 7 days after a successful fetch. The suppression window is set by `FA_SUPPRESS_DAYS` in `tails.py`.
+AeroDataBox fetches are suppressed per tail for 7 days after a successful fetch. The suppression window is set by `FA_SUPPRESS_DAYS` in `tails.py`.
+
+**Getting an API key:**
+1. Sign up at [rapidapi.com](https://rapidapi.com/aedbx-aedbx/api/aerodatabox)
+2. Subscribe to the AeroDataBox Basic plan ($5/month, 3,000 calls)
+3. Copy your RapidAPI key from the dashboard
+
+**Setting the key** (never put it in `config.py` or commit it to git):
+```bash
+# Add to ~/.zshrc or ~/.bashrc for persistence
+export AERODATABOX_API_KEY=your_rapidapi_key_here
+source ~/.zshrc
+```
+
+**adsb.lol** requires no key — it is a free community ADS-B feed.
 
 ## Running
 
 ```bash
-# Optional: set FlightAware API key
-export FLIGHTAWARE_API_KEY=your_key_here
-
 python main.py
 ```
 
@@ -144,22 +155,20 @@ Example output:
 ```
 FlightScrapper starting.
   Aircraft types: C208, C408
-  Callsign filter: ['FDX', 'DHX', ...]
+  Callsign filter: ['BEZ', 'PCM', ...]
   Poll interval : 60s ± 10s
-  FlightAware  : enabled (batch every 24h)
-Loaded 25431 airports.
-Loaded 12 known tail numbers.
+  AeroDataBox  : enabled (batch every 24h)
+Loaded 32700 airports.
+Loaded 45 known tail numbers.
 Resumed 3 in-flight aircraft from buffer.
-[2026-03-25 14:00:01 UTC] poll #1 — 5 aircraft matching filters
-  New tail discovered: N208FE
-  Takeoff: FDX1234 from KMEM (Memphis)
-[2026-03-25 14:41:03 UTC] poll #42 — 4 aircraft matching filters
-  Landed:  FDX1234 KMEM (Memphis) -> KBNA (Nashville) (41min)
-  Saved: FDX1234 KMEM->KBNA
-[FlightAware] Starting batch for 8/12 tail(s) due for refresh...
-  [FA] Saved: WIG001 TJSJ->TISX (2026-03-24)
-  [FA] N208FE (1/8): 14 fetched, 9 saved, 5 already known
-[FlightAware] Batch complete — 23 saved, 18 duplicates skipped.
+[2026-03-26 09:53:49 UTC] poll #1 — 7 aircraft matching filters
+  Near-takeoff join: BEZ321 from TJSJ (San Juan) at 1200ft
+  New tail discovered: N960HL — fetching history...
+  History for N960HL: 7 fetched, 7 saved
+[AeroDataBox] Starting batch for 8/45 tail(s) due for refresh...
+  [ADB] Saved: BEZ2321 TJSJ->TFFJ (2026-03-24)
+  [ADB] N960HL (1/8): 7 fetched, 7 saved, 0 already known
+[AeroDataBox] Batch complete — 12 saved, 3 duplicates skipped.
 ```
 
 Stop with `Ctrl+C` — active flights are saved to `buffer.json` and resumed on next start.
@@ -171,7 +180,7 @@ Stop with `Ctrl+C` — active flights are saved to `buffer.json` and resumed on 
 | `flights.db` | SQLite database of completed flights |
 | `buffer.json` | In-flight tracker state, persisted for crash resilience |
 | `data/airports.csv` | OurAirports database, downloaded on first run |
-| `data/tails.json` | Known tail numbers with last FlightAware fetch timestamps |
+| `data/tails.json` | Known tail numbers with last AeroDataBox fetch timestamps |
 
 None of these are committed to git.
 
@@ -220,7 +229,7 @@ ORDER BY avg_min DESC;
 |---|---|---|---|
 | [adsb.lol](https://adsb.lol) | Live polling | Free | No |
 | [OurAirports](https://ourairports.com/data/) | Airport database | Free (CC0) | No |
-| [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) | Historical enrichment | $5/month free credit | Yes |
+| [AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) | Historical enrichment | $5/month (3,000 calls) | Yes (RapidAPI key) |
 
 ## Limitations
 
