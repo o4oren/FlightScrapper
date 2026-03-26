@@ -184,6 +184,57 @@ Stop with `Ctrl+C` — active flights are saved to `buffer.json` and resumed on 
 
 None of these are committed to git.
 
+## Generating schedules
+
+`schedule.py` reads the flights database and produces a **weekly timetable** — grouped by airline, broken down by day — in three output formats.
+
+### Usage
+
+```bash
+# Pretty-print to stdout (default if no flags given)
+python3 schedule.py
+
+# Write schedule.html (opens in any browser)
+python3 schedule.py --html
+
+# Write schedule.csv (import into Excel, Google Sheets, etc.)
+python3 schedule.py --csv
+
+# All three at once
+python3 schedule.py --text --html --csv
+
+# Custom output paths
+python3 schedule.py --html --html-out reports/schedule.html \
+                    --csv  --csv-out  reports/schedule.csv
+```
+
+### What it produces
+
+Each output lists every **recorded flight per airline per day of the week**, sorted by departure time, with columns:
+
+| Column | Description |
+|---|---|
+| Flight | Callsign (e.g. `MTN7501`) |
+| From | Origin ICAO code + city |
+| To | Destination ICAO code + city |
+| Dep (UTC) | Departure time, rounded to nearest 5 min |
+| Arr (UTC) | Arrival time, rounded to nearest 5 min |
+| Dur | Flight duration in minutes |
+| A/C | Aircraft type (`C208`, `C408`, `ATR-42`, …) |
+
+Airline names and network roles (FedEx feeder / DHL feeder) are resolved from a built-in ICAO code table and supplemented automatically for any new operator prefixes found in the database. The HTML output colour-codes FedEx operators (purple) and DHL operators (yellow).
+
+### Output files
+
+| File | Description |
+|---|---|
+| `schedule.html` | Styled browser timetable, one card per airline |
+| `schedule.csv` | Flat file with one row per flight-day, suitable for spreadsheet analysis |
+
+Neither file is committed to git — regenerate them any time from the live database.
+
+---
+
 ## Querying the data
 
 Use any SQLite client, or [Datasette](https://datasette.io/) for a browser UI with built-in CSV export:
