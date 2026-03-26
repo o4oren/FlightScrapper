@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-FlightScrapper — polls adsb.lol for C208 feeder flights and stores
-completed flights (with resolved origin/destination) in a SQLite database.
+FlightScrapper — tracks cargo feeder flights by aircraft type and airline callsign.
+
+Live tracking: polls adsb.lol every 60s, detects takeoff/landing events,
+snaps positions to OurAirports for O/D resolution, stores completed flights.
+
+Historical enrichment: AeroDataBox batch runs daily, fetching 7 days of
+history per tail number, merging missing fields into existing records
+(e.g. airport names from AeroDataBox, max altitude from live tracking).
 """
 
 import os
