@@ -179,7 +179,11 @@ def run_batch():
                     skipped += 1
             print(f"  [ADB] {tail} ({i}/{total}): {len(flights)} fetched, "
                   f"{tail_saved} saved, {tail_skipped} already known")
-            tails_store.record_fa_fetch(tail)
+            if len(flights) == 0:
+                print(f"  [ADB] No flights found for {tail} — removing from tails")
+                tails_store.remove_tail(tail)
+            else:
+                tails_store.record_fa_fetch(tail)
         except ValueError as e:
             # Empty response body — AeroDataBox has no data for this tail, remove it
             print(f"  [ADB] No data for {tail} (removing from tails): {e}")

@@ -98,7 +98,11 @@ def process_poll(aircraft_list):
                 flights = aerodatabox.fetch_flights_for_tail(tail)
                 new_count = sum(1 for f in flights if database.save_flight_if_new(f))
                 print(f"  History for {tail}: {len(flights)} fetched, {new_count} saved")
-                tails_store.record_fa_fetch(tail)
+                if len(flights) == 0:
+                    print(f"  No history data for {tail} — removing from tails")
+                    tails_store.remove_tail(tail)
+                else:
+                    tails_store.record_fa_fetch(tail)
             except ValueError as e:
                 # Empty response — AeroDataBox has no data for this tail, remove it
                 print(f"  No history data for {tail} (removing from tails): {e}")
