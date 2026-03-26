@@ -111,12 +111,14 @@ def fetch_flights_for_tail(tail):
         duration_min = (arrival_dt - departure_dt).total_seconds() / 60
 
         aircraft = f.get("aircraft") or {}
+        airline = f.get("airline") or {}
         callsign = (f.get("callSign") or "").strip()
 
         flights.append({
             "callsign": callsign,
             "tail": aircraft.get("reg") or tail,
             "aircraft_type": _model_to_icao(aircraft.get("model")),
+            "airline_name": (airline.get("name") or "").strip() or None,
             "icao_hex": aircraft.get("modeS", ""),
             "origin_icao": origin_icao,
             "origin_name": origin_name,

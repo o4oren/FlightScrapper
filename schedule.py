@@ -102,7 +102,32 @@ def load_schedule():
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
 
-    # Discover which operator prefixes are actually in the DB
+    # Discover operator prefixes and most common airline_name from DB
+    cur.execute("""
+        SELECT substr(callsign, 1, 3) AS op,
+               airline_name
+        FROM flights
+        WHERE length(callsign) >= 4
+          AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
+        ORDER BY op
+    """)
+    # Build {op: most_common_airline_name} from DB
+    op_names = collections.defaultdict(collections.Counter)
+    for op, name in cur.fetchall():
+        if name:
+            op_names[op][name] += 1
+    db_names = {op: counter.most_common(1)[0][0] for op, counter in op_names.items()}
+
+    def _resolve_operator(op):
+        if op in _KNOWN_OPERATORS:
+            return _KNOWN_OPERATORS[op]
+        # Fall back to airline_name stored in the DB
+        name = db_names.get(op, f'{op} (unknown)')
+        return (name, 'Unknown', '#888888', '#ffffff')
+
+    # Get distinct operator prefixes
     cur.execute("""
         SELECT DISTINCT substr(callsign, 1, 3) AS op
         FROM flights
@@ -112,7 +137,7 @@ def load_schedule():
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
         ORDER BY op
     """)
-    operators = {row[0]: _operator_meta(row[0]) for row in cur.fetchall()}
+    operators = {row[0]: _resolve_operator(row[0]) for row in cur.fetchall()}
 
     cur.execute("""
         SELECT
