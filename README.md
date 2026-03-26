@@ -229,7 +229,7 @@ ORDER BY avg_min DESC;
 |---|---|---|---|
 | [adsb.lol](https://adsb.lol) | Live polling | Free | No |
 | [OurAirports](https://ourairports.com/data/) | Airport database | Free (CC0) | No |
-| [AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) | Historical enrichment | $5/month (3,000 calls) | Yes (RapidAPI key) |
+| [AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) | Historical enrichment | free (600 api units) or $5/month (6,000 api units - 1,000 calls) | Yes (RapidAPI key) |
 
 ## Limitations
 
