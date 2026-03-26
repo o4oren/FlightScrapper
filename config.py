@@ -23,10 +23,11 @@ SNAP_RADIUS_KM_FALLBACK = 10.0
 # Data source
 ADSB_API_URL = "https://api.adsb.lol/v2/type/{aircraft_type}"
 
-# AeroDataBox API (via RapidAPI) — set env var AERODATABOX_API_KEY or fill in below
-AERODATABOX_API_KEY = f"{os.environ.get('AERODATABOX_API_KEY', '')}"
-AERODATABOX_LOOKBACK_DAYS = 7        # Free tier supports 7-day history per request
-AERODATABOX_BATCH_INTERVAL_HOURS = 24  # How often to check for tails due for a refresh
+# FlightAware AeroAPI — set env var FLIGHTAWARE_API_KEY or fill in below
+FLIGHTAWARE_API_KEY = f"{os.environ.get('FLIGHTAWARE_API_KEY', '')}"
+FLIGHTAWARE_API_URL = "https://aeroapi.flightaware.com/aeroapi"
+FLIGHTAWARE_LOOKBACK_DAYS = 14       # How many days back to fetch on each batch run
+FLIGHTAWARE_BATCH_INTERVAL_HOURS = 24  # How often to run the FlightAware batch
 
 # Known tail numbers — seed list, runtime additions saved to tails.json
 # adsb.lol will add new tails automatically as they are observed
