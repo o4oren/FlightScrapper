@@ -20,6 +20,7 @@ import sqlite3
 import sys
 import datetime as _dt
 from config import DB_PATH
+import airlines as airlines_db
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -82,13 +83,42 @@ def round5(hhmm: str) -> str:
     return f'{(rounded % 1440) // 60:02d}:{rounded % 60:02d}'
 
 
-def _operator_meta(op: str) -> tuple:
-    """Return (name, network, bg_color, fg_color) for an operator prefix."""
+def _tail_network(tails):
+    """Infer FedEx/DHL network from tail number suffix conventions."""
+    fedex = sum(1 for t in tails if t and (t.upper().endswith('FE') or t.upper().endswith('FX')))
+    dhl   = sum(1 for t in tails if t and t.upper().endswith('HL'))
+    if fedex > dhl and fedex > 0:
+        return 'FedEx feeder', '#4d148c', '#fff'
+    if dhl > fedex and dhl > 0:
+        return 'DHL feeder', '#ffcc00', '#333'
+    return 'Unknown', '#888888', '#ffffff'
+
+
+def _operator_meta(op, db_name=None, tails=None):
+    """
+    Return (name, network, bg_color, fg_color) for an operator prefix.
+    Fallback chain:
+    1. Hardcoded _KNOWN_OPERATORS table
+    2. OpenFlights airlines.dat lookup by ICAO code
+    3. Tail number suffix heuristic (FE/FX = FedEx, HL = DHL)
+    4. airline_name stored in the flights DB
+    5. Generic unknown label
+    """
     if op in _KNOWN_OPERATORS:
         return _KNOWN_OPERATORS[op]
-    # Auto-detect network from tail suffix conventions in the DB
-    # (FE/FX = FedEx, HL = DHL) — used as a fallback label
-    return (f'{op} (unknown)', 'Unknown', '#888888', '#ffffff')
+
+    # OpenFlights lookup
+    of_name, of_country = airlines_db.lookup(op)
+    network, bg, fg = _tail_network(tails or [])
+    if of_name:
+        label = f"{of_name} ({of_country})" if of_country else of_name
+        return (label, network, bg, fg)
+
+    # Tail heuristic already computed above — use DB name if available
+    if db_name:
+        return (db_name, network, bg, fg)
+
+    return (f'{op} (unknown)', network, bg, fg)
 
 
 # ── Data loading ─────────────────────────────────────────────────────────────
@@ -102,30 +132,26 @@ def load_schedule():
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
 
-    # Discover operator prefixes and most common airline_name from DB
+    # Load airlines reference data
+    airlines_db.load_airlines()
+
+    # Gather per-operator: most common airline_name and all tail numbers seen
     cur.execute("""
-        SELECT substr(callsign, 1, 3) AS op,
-               airline_name
+        SELECT substr(callsign, 1, 3) AS op, airline_name, tail
         FROM flights
         WHERE length(callsign) >= 4
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
-        ORDER BY op
     """)
-    # Build {op: most_common_airline_name} from DB
     op_names = collections.defaultdict(collections.Counter)
-    for op, name in cur.fetchall():
+    op_tails = collections.defaultdict(set)
+    for op, name, tail in cur.fetchall():
         if name:
             op_names[op][name] += 1
+        if tail:
+            op_tails[op].add(tail)
     db_names = {op: counter.most_common(1)[0][0] for op, counter in op_names.items()}
-
-    def _resolve_operator(op):
-        if op in _KNOWN_OPERATORS:
-            return _KNOWN_OPERATORS[op]
-        # Fall back to airline_name stored in the DB
-        name = db_names.get(op, f'{op} (unknown)')
-        return (name, 'Unknown', '#888888', '#ffffff')
 
     # Get distinct operator prefixes
     cur.execute("""
@@ -137,7 +163,10 @@ def load_schedule():
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
         ORDER BY op
     """)
-    operators = {row[0]: _resolve_operator(row[0]) for row in cur.fetchall()}
+    operators = {
+        row[0]: _operator_meta(row[0], db_names.get(row[0]), list(op_tails.get(row[0], [])))
+        for row in cur.fetchall()
+    }
 
     cur.execute("""
         SELECT

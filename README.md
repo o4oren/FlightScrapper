@@ -180,6 +180,7 @@ Stop with `Ctrl+C` — active flights are saved to `buffer.json` and resumed on 
 | `flights.db` | SQLite database of completed flights |
 | `buffer.json` | In-flight tracker state, persisted for crash resilience |
 | `data/airports.csv` | OurAirports database, downloaded on first run |
+| `data/airlines.dat` | OpenFlights airline database, downloaded on first schedule run |
 | `data/tails.json` | Known tail numbers with last AeroDataBox fetch timestamps |
 
 None of these are committed to git.
@@ -222,7 +223,13 @@ Each output lists every **recorded flight per airline per day of the week**, sor
 | Dur | Flight duration in minutes |
 | A/C | Aircraft type (`C208`, `C408`, `ATR-42`, …) |
 
-Airline names and network roles (FedEx feeder / DHL feeder) are resolved from a built-in ICAO code table and supplemented automatically for any new operator prefixes found in the database. The HTML output colour-codes FedEx operators (purple) and DHL operators (yellow).
+Airline names and network roles are resolved using a four-level fallback chain:
+1. **Hardcoded table** — known FedEx/DHL feeder operators with names and colours
+2. **OpenFlights airlines.dat** — 5,800+ airlines keyed by ICAO code, downloaded automatically on first run
+3. **Tail number heuristic** — tails ending in `FE`/`FX` → FedEx feeder, `HL` → DHL feeder
+4. **DB airline_name** — name stored from AeroDataBox history fetches
+
+The HTML output colour-codes FedEx operators (purple) and DHL operators (yellow). Unknown operators get a grey header with whatever name could be resolved.
 
 ### Output files
 
@@ -280,6 +287,7 @@ ORDER BY avg_min DESC;
 |---|---|---|---|
 | [adsb.lol](https://adsb.lol) | Live polling | Free | No |
 | [OurAirports](https://ourairports.com/data/) | Airport database | Free (CC0) | No |
+| [OpenFlights](https://openflights.org/data.php) | Airline name lookup | Free (ODbL) | No |
 | [AeroDataBox via RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) | Historical enrichment | Free (600 units) or $5/month (6,000 units) | Yes (RapidAPI key) |
 
 ### Why these sources?
