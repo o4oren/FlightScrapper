@@ -182,7 +182,7 @@ def run_batch():
             tails_store.record_fa_fetch(tail)
         except Exception as e:
             print(f"  [ADB] Error fetching {tail}: {e}")
-        time.sleep(0.5)
+        time.sleep(2)
 
     print(f"[AeroDataBox] Batch complete — {saved} saved, {skipped} duplicates skipped.")
     return saved, skipped
