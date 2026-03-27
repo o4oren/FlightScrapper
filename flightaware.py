@@ -48,6 +48,21 @@ def _parse_airport(ap):
     )
 
 
+def _parse_altitude(f):
+    """
+    Extract filed/cruise altitude from a FlightAware flight record.
+    Tries filed_altitude and cruising_altitude (both in hundreds of feet).
+    Returns rounded-to-nearest-1000 feet, or None.
+    """
+    raw = f.get("filed_altitude") or f.get("cruising_altitude")
+    if raw:
+        try:
+            return round(int(raw) * 100, -3)
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
 def _build_fa_url(f, origin_icao, dest_icao):
     """Build a specific FlightAware flight URL: /live/flight/{ident}/history/{date}/{time}Z/{orig}/{dest}"""
     ident = (f.get("ident") or "").strip()
@@ -124,7 +139,7 @@ def fetch_flights_for_tail(tail):
             "departure_time": actual_off,
             "arrival_time": actual_on,
             "duration_min": round(duration_min, 1),
-            "max_alt_ft": None,
+            "max_alt_ft": _parse_altitude(f),
             "flightaware_url": _build_fa_url(f, origin_icao, dest_icao),
             "route": (f.get("route") or "").strip() or None,
             "airline_name": (f.get("operator") or f.get("operator_iata") or "").strip() or None,
