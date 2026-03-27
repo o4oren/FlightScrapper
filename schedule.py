@@ -21,6 +21,7 @@ import sys
 import datetime as _dt
 from config import DB_PATH
 import airlines as airlines_db
+import airports as airports_db
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,11 @@ CSV_OUT  = 'schedule.csv'
 VCI_OUT  = 'schedule_vci.csv'
 
 
+def _known_icao(icao):
+    """Return True if the ICAO code resolves to a known airport in OurAirports."""
+    return airports_db.lookup_by_icao(icao) is not None
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def round5(hhmm: str) -> str:
@@ -156,8 +162,10 @@ def load_schedule():
     conn = sqlite3.connect(DB_PATH)
     cur  = conn.cursor()
 
-    # Load airlines reference data
+    # Load reference data
     airlines_db.load_airlines()
+    if not airports_db._airports:
+        airports_db.load_airports()
 
     # Gather per-operator: most common airline_name and all tail numbers seen
     cur.execute("""
@@ -166,12 +174,6 @@ def load_schedule():
         WHERE length(callsign) >= 4
           AND origin_icao IS NOT NULL AND origin_icao != ''
           AND dest_icao IS NOT NULL AND dest_icao != ''
-          AND substr(origin_icao,1,1) BETWEEN 'A' AND 'Z'
-          AND substr(origin_icao,2,1) BETWEEN 'A' AND 'Z'
-          AND substr(origin_icao,3,1) BETWEEN 'A' AND 'Z'
-          AND substr(dest_icao,1,1) BETWEEN 'A' AND 'Z'
-          AND substr(dest_icao,2,1) BETWEEN 'A' AND 'Z'
-          AND substr(dest_icao,3,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
@@ -217,19 +219,13 @@ def load_schedule():
         WHERE duration_min > 0
           AND origin_icao IS NOT NULL AND origin_icao != ''
           AND dest_icao IS NOT NULL AND dest_icao != ''
-          AND substr(origin_icao,1,1) BETWEEN 'A' AND 'Z'
-          AND substr(origin_icao,2,1) BETWEEN 'A' AND 'Z'
-          AND substr(origin_icao,3,1) BETWEEN 'A' AND 'Z'
-          AND substr(dest_icao,1,1) BETWEEN 'A' AND 'Z'
-          AND substr(dest_icao,2,1) BETWEEN 'A' AND 'Z'
-          AND substr(dest_icao,3,1) BETWEEN 'A' AND 'Z'
           AND length(callsign) >= 4
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
         ORDER BY op, dow, dep_utc
     """)
-    rows = cur.fetchall()
+    rows = [r for r in cur.fetchall() if _known_icao(r[2]) and _known_icao(r[4])]
     cur.execute("SELECT MIN(departure_time), MAX(departure_time) FROM flights")
     date_range = cur.fetchone()
     conn.close()
@@ -505,7 +501,8 @@ def load_vci_data():
         GROUP BY callsign, origin_icao, dest_icao
         ORDER BY op, callsign, origin_icao, dest_icao
     """)
-    rows = cur.fetchall()
+    # r[3]=origin_icao, r[4]=dest_icao
+    rows = [r for r in cur.fetchall() if _known_icao(r[3]) and _known_icao(r[4])]
     conn.close()
     return rows
 
