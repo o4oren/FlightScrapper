@@ -251,6 +251,8 @@ python3 schedule.py --html --html-out reports/schedule.html \
 
 ### What it produces
 
+![Schedule preview](docs/schedule_preview.png)
+
 Each output lists every **recorded flight per airline per day of the week**, sorted by departure time, with columns:
 
 | Column | Description |
