@@ -366,10 +366,119 @@ def _ac_badge(ac):
     label = AC_LABEL.get(ac, ac[:8])
     return f'<span class="ac" style="background:{html_mod.escape(bg)}">{html_mod.escape(label)}</span>'
 
+
+def load_map_routes():
+    """
+    Return deduplicated routes per operator with coordinates for the map.
+    Each route: (op, callsign, origin_icao, dest_icao, orig_lat, orig_lon, dest_lat, dest_lon,
+                 origin_city, dest_city)
+    Only includes routes where all four coordinates are present.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            substr(callsign, 1, 3) AS op,
+            callsign,
+            origin_icao, dest_icao,
+            origin_lat, origin_lon,
+            dest_lat, dest_lon,
+            COALESCE(origin_city, origin_icao) AS origin_city,
+            COALESCE(dest_city, dest_icao)     AS dest_city
+        FROM flights
+        WHERE origin_lat IS NOT NULL AND origin_lon IS NOT NULL
+          AND dest_lat IS NOT NULL AND dest_lon IS NOT NULL
+          AND origin_icao IS NOT NULL AND origin_icao != ''
+          AND dest_icao IS NOT NULL AND dest_icao != ''
+          AND duration_min > 0
+          AND length(callsign) >= 4
+          AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
+        GROUP BY substr(callsign,1,3), origin_icao, dest_icao
+        ORDER BY op, origin_icao, dest_icao
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return [r for r in rows if _known_icao(r[2]) and _known_icao(r[3])]
+
+
+def _build_map_html(routes, operators):
+    """Build a Leaflet map with geodesic lines per airline, embedded as HTML."""
+    import json as _json
+
+    # Group routes by operator
+    by_op = collections.defaultdict(list)
+    for op, cs, orig, dest, olat, olon, dlat, dlon, ocity, dcity in routes:
+        by_op[op].append({
+            'callsign': cs, 'orig': orig, 'dest': dest,
+            'olat': olat, 'olon': olon, 'dlat': dlat, 'dlon': dlon,
+            'ocity': ocity, 'dcity': dcity,
+        })
+
+    # Build per-operator JS data
+    op_data = []
+    for op in sorted(by_op):
+        _, _, bg, _ = operators.get(op, (op, '', '#888', '#fff'))
+        op_data.append({'op': op, 'color': bg, 'routes': by_op[op]})
+
+    data_json = _json.dumps(op_data)
+
+    return f"""
+<div id="route-map" style="height:500px;border-radius:10px;overflow:hidden;margin-bottom:28px;box-shadow:0 2px 12px rgba(0,0,0,.13)"></div>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.geodesic@2.7.1/dist/leaflet.geodesic.umd.min.js"></script>
+<script>
+(function(){{
+  var map = L.map('route-map', {{zoomControl:true}}).setView([30, -40], 3);
+  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 18
+  }}).addTo(map);
+
+  var data = {data_json};
+  var airports = {{}};
+
+  data.forEach(function(airline) {{
+    var color = airline.color;
+    airline.routes.forEach(function(r) {{
+      // Geodesic line
+      var line = L.geodesic(
+        [[r.olat, r.olon], [r.dlat, r.dlon]],
+        {{weight: 1.5, color: color, opacity: 0.8}}
+      ).addTo(map);
+      line.bindPopup(
+        '<b>' + r.callsign + '</b><br>' +
+        r.orig + ' (' + r.ocity + ') &rarr; ' + r.dest + ' (' + r.dcity + ')'
+      );
+
+      // Airport dots
+      [
+        [r.olat, r.olon, r.orig, r.ocity],
+        [r.dlat, r.dlon, r.dest, r.dcity]
+      ].forEach(function(ap) {{
+        var key = ap[2];
+        if (!airports[key]) {{
+          airports[key] = L.circleMarker([ap[0], ap[1]], {{
+            radius: 4, color: '#fff', weight: 1.5,
+            fillColor: '#333', fillOpacity: 0.9
+          }}).addTo(map).bindPopup('<b>' + ap[2] + '</b><br>' + ap[3]);
+        }}
+      }});
+    }});
+  }});
+}})();
+</script>
+"""
+
+
 def write_html(sched, operators, generated_at, date_range, path=HTML_OUT):
     dr_start = (date_range[0] or '')[:10]
     dr_end   = (date_range[1] or '')[:10]
     total_flights = sum(sum(len(v) for v in d.values()) for d in sched.values())
+
+    routes = load_map_routes()
+    map_html = _build_map_html(routes, operators) if routes else ''
 
     parts = [
         '<!DOCTYPE html><html lang="en"><head>',
@@ -383,6 +492,7 @@ def write_html(sched, operators, generated_at, date_range, path=HTML_OUT):
         f'Generated: {html_mod.escape(generated_at)}'
         f' &nbsp;·&nbsp; Data range: {html_mod.escape(dr_start)} → {html_mod.escape(dr_end)}'
         f' &nbsp;·&nbsp; {len(sched)} airlines &nbsp;·&nbsp; {total_flights} flights</p>',
+        map_html,
     ]
 
     for op in sorted(sched):
