@@ -135,7 +135,7 @@ History fetches are suppressed per tail for 7 days after a successful fetch (con
 | Setting | Default | Description |
 |---|---|---|
 | `FLIGHTAWARE_API_KEY` | `""` | AeroAPI key — or set env var `FLIGHTAWARE_API_KEY` |
-| `FLIGHTAWARE_LOOKBACK_DAYS` | `14` | Days of history to fetch per tail number |
+| `FLIGHTAWARE_LOOKBACK_DAYS` | `10` | Days of history to fetch per tail number (personal tier max) |
 | `FLIGHTAWARE_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for refresh |
 
 **Coverage:** Global including Hawaii and Caribbean (own receiver network).

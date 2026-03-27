@@ -153,7 +153,7 @@ def run_batch():
             tails_store.record_fa_fetch(tail)
         except Exception as e:
             print(f"  [FA] Error fetching {tail}: {e}")
-        time.sleep(0.5)  # be polite to the API
+        time.sleep(3)  # FlightAware rate limiting
 
     print(f"[FlightAware] Batch complete — {saved} saved, {skipped} duplicates skipped.")
     return saved, skipped

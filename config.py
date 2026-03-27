@@ -32,7 +32,7 @@ HISTORY_PROVIDER = "flightaware"
 # Coverage: global including Hawaii and Caribbean.
 FLIGHTAWARE_API_KEY = f"{os.environ.get('FLIGHTAWARE_API_KEY', '')}"
 FLIGHTAWARE_API_URL = "https://aeroapi.flightaware.com/aeroapi"
-FLIGHTAWARE_LOOKBACK_DAYS = 14       # Personal tier supports 14-day history
+FLIGHTAWARE_LOOKBACK_DAYS = 10       # Personal tier supports up to 10 days of history
 FLIGHTAWARE_BATCH_INTERVAL_HOURS = 24
 
 # AeroDataBox API (via RapidAPI) — set env var AERODATABOX_API_KEY or fill in below
