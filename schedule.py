@@ -441,11 +441,29 @@ def _build_map_html(routes, operators):
 
     data_json = _json.dumps(op_data)
 
+    # Build legend HTML
+    legend_items = ''.join(
+        f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+        f'<span style="display:inline-block;width:24px;height:3px;background:{d["color"]};border-radius:2px"></span>'
+        f'<span style="font-size:12px;color:#333">{html_mod.escape(d["op"])}</span>'
+        f'</div>'
+        for d in op_data
+    )
+
     return f"""
-<div id="route-map" style="height:500px;border-radius:10px;overflow:hidden;margin-bottom:28px;box-shadow:0 2px 12px rgba(0,0,0,.13)"></div>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet.geodesic@2.7.1/dist/leaflet.geodesic.umd.min.js"></script>
+<div id="map-section" style="margin-bottom:28px">
+  <div id="map-wrapper" style="position:relative;height:500px;min-height:200px;resize:vertical;overflow:hidden;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.13)">
+    <div id="route-map" style="height:100%;width:100%"></div>
+    <div id="map-legend" style="position:absolute;top:10px;right:10px;z-index:1000;background:rgba(255,255,255,0.92);border-radius:8px;padding:10px 12px;box-shadow:0 1px 6px rgba(0,0,0,.15);max-height:80%;overflow-y:auto">
+      <div style="font-size:11px;font-weight:700;color:#666;letter-spacing:.5px;margin-bottom:6px;text-transform:uppercase">Airlines</div>
+      {legend_items}
+    </div>
+    <div id="map-resize-hint" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:10px;color:#999;pointer-events:none">⬍ drag to resize</div>
+  </div>
+</div>
 <script>
 (function(){{
   var map = L.map('route-map', {{zoomControl:true}}).setView([30, -40], 3);
@@ -454,13 +472,17 @@ def _build_map_html(routes, operators):
     subdomains: 'abcd', maxZoom: 19
   }}).addTo(map);
 
+  // Invalidate map size when wrapper is resized
+  var wrapper = document.getElementById('map-wrapper');
+  var ro = new ResizeObserver(function() {{ map.invalidateSize(); }});
+  ro.observe(wrapper);
+
   var data = {data_json};
   var airports = {{}};
 
   data.forEach(function(airline) {{
     var color = airline.color;
     airline.routes.forEach(function(r) {{
-      // Geodesic line
       var line = L.geodesic(
         [[r.olat, r.olon], [r.dlat, r.dlon]],
         {{weight: 1.5, color: color, opacity: 0.8}}
@@ -470,7 +492,6 @@ def _build_map_html(routes, operators):
         r.orig + ' (' + r.ocity + ') &rarr; ' + r.dest + ' (' + r.dcity + ')'
       );
 
-      // Airport dots
       [
         [r.olat, r.olon, r.orig, r.ocity],
         [r.dlat, r.dlon, r.dest, r.dcity]
