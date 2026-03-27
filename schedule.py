@@ -1,5 +1,5 @@
 """
-schedule.py — Generate freight carrier weekly schedules from the flights DB.
+schedule.py — Generate weekly flight schedules from the flights DB.
 
 Outputs (any combination via flags):
   --text    Pretty-print timetable to stdout  (default if no flags given)
@@ -27,30 +27,50 @@ import airlines as airlines_db
 DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 DOW_MAP = {1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 0: 'Sun'}
 
+# Colour palette for operator headers — cycles through for unknown operators
+# Format: (bg, fg)
+_PALETTE = [
+    ('#2c3e50', '#fff'),
+    ('#1a6b8a', '#fff'),
+    ('#27ae60', '#fff'),
+    ('#8e44ad', '#fff'),
+    ('#c0392b', '#fff'),
+    ('#d35400', '#fff'),
+    ('#16a085', '#fff'),
+    ('#2980b9', '#fff'),
+]
+_palette_index = {}  # { op: (bg, fg) }
+
+def _palette_for(op):
+    if op not in _palette_index:
+        idx = len(_palette_index) % len(_PALETTE)
+        _palette_index[op] = _PALETTE[idx]
+    return _palette_index[op]
+
 # Known operator metadata keyed by ICAO airline code.
 # Any prefix found in the DB but absent here gets a sensible fallback in _operator_meta().
-# Format: (full name, network role, header bg colour, header fg colour)
+# Format: (full name, network role)  — colours assigned dynamically from palette
 _KNOWN_OPERATORS = {
     # ── FedEx feeders ────────────────────────────────────────────────────────
-    'BVN': ('Baron Aviation Services',   'FedEx feeder',        '#4d148c', '#fff'),
-    'CFS': ('Empire Airlines',           'FedEx feeder',        '#4d148c', '#fff'),
-    'CPT': ('Corporate Air',             'FedEx feeder',        '#4d148c', '#fff'),
-    'IRO': ('Iron Air (CSA Air Inc.)',   'FedEx feeder',        '#4d148c', '#fff'),
-    'MAL': ('Morningstar Air Express',   'FedEx feeder (CA)',   '#4d148c', '#fff'),
-    'MTN': ('Mountain Air Cargo',        'FedEx feeder',        '#4d148c', '#fff'),
-    'PCM': ('Westair Industries',        'FedEx feeder',        '#4d148c', '#fff'),
-    'SNC': ('Air Cargo Carriers',        'FedEx feeder',        '#4d148c', '#fff'),
-    'WIG': ('Wiggins Airways',           'FedEx feeder',        '#4d148c', '#fff'),
-    'AIG': ('Ameriflight',               'FedEx feeder',        '#4d148c', '#fff'),
+    'BVN': ('Baron Aviation Services',   'FedEx feeder'),
+    'CFS': ('Empire Airlines',           'FedEx feeder'),
+    'CPT': ('Corporate Air',             'FedEx feeder'),
+    'IRO': ('Iron Air (CSA Air Inc.)',   'FedEx feeder'),
+    'MAL': ('Morningstar Air Express',   'FedEx feeder (CA)'),
+    'MTN': ('Mountain Air Cargo',        'FedEx feeder'),
+    'PCM': ('Westair Industries',        'FedEx feeder'),
+    'SNC': ('Air Cargo Carriers',        'FedEx feeder'),
+    'WIG': ('Wiggins Airways',           'FedEx feeder'),
+    'AIG': ('Ameriflight',               'FedEx feeder'),
     # ── DHL feeders ──────────────────────────────────────────────────────────
-    'BEZ': ('Kingfisher Air Services',   'DHL feeder',          '#ffcc00', '#333'),
-    'DHK': ('DHL Air (UK)',              'DHL feeder',          '#ffcc00', '#333'),
-    'DHX': ('DHL Air',                  'DHL feeder',          '#ffcc00', '#333'),
-    'VEC': ('Veca Airlines',             'DHL feeder',          '#ffcc00', '#333'),
-    'TJN': ('Trans-Jamaican Airlines',   'DHL feeder',          '#ffcc00', '#333'),
-    'BOX': ('Sky Lease Cargo',           'DHL feeder',          '#ffcc00', '#333'),
-    'JOS': ('Jota Aviation',             'DHL feeder',          '#ffcc00', '#333'),
-    'SET': ('Sierra Express',            'DHL feeder',          '#ffcc00', '#333'),
+    'BEZ': ('Kingfisher Air Services',   'DHL feeder'),
+    'DHK': ('DHL Air (UK)',              'DHL feeder'),
+    'DHX': ('DHL Air',                   'DHL feeder'),
+    'VEC': ('Veca Airlines',             'DHL feeder'),
+    'TJN': ('Trans-Jamaican Airlines',   'DHL feeder'),
+    'BOX': ('Sky Lease Cargo',           'DHL feeder'),
+    'JOS': ('Jota Aviation',             'DHL feeder'),
+    'SET': ('Sierra Express',            'DHL feeder'),
 }
 
 AC_LABEL = {
@@ -84,14 +104,14 @@ def round5(hhmm: str) -> str:
 
 
 def _tail_network(tails):
-    """Infer FedEx/DHL network from tail number suffix conventions."""
+    """Infer FedEx/DHL network role from tail number suffix conventions."""
     fedex = sum(1 for t in tails if t and (t.upper().endswith('FE') or t.upper().endswith('FX')))
     dhl   = sum(1 for t in tails if t and t.upper().endswith('HL'))
     if fedex > dhl and fedex > 0:
-        return 'FedEx feeder', '#4d148c', '#fff'
+        return 'FedEx feeder'
     if dhl > fedex and dhl > 0:
-        return 'DHL feeder', '#ffcc00', '#333'
-    return 'Unknown', '#888888', '#ffffff'
+        return 'DHL feeder'
+    return ''
 
 
 def _operator_meta(op, db_name=None, tails=None):
@@ -104,12 +124,15 @@ def _operator_meta(op, db_name=None, tails=None):
     4. airline_name stored in the flights DB
     5. Generic unknown label
     """
+    bg, fg = _palette_for(op)
+
     if op in _KNOWN_OPERATORS:
-        return _KNOWN_OPERATORS[op]
+        name, network = _KNOWN_OPERATORS[op]
+        return (name, network, bg, fg)
 
     # OpenFlights lookup
     of_name, of_country = airlines_db.lookup(op)
-    network, bg, fg = _tail_network(tails or [])
+    network = _tail_network(tails or [])
     if of_name:
         label = f"{of_name} ({of_country})" if of_country else of_name
         return (label, network, bg, fg)
@@ -215,7 +238,7 @@ def print_schedule(sched, operators, generated_at, date_range):
     dr_start = (date_range[0] or '')[:10]
     dr_end   = (date_range[1] or '')[:10]
 
-    print(f'\n  FREIGHT CARRIER WEEKLY SCHEDULE  —  All times UTC (rounded to nearest 5 min)')
+    print(f'\n  WEEKLY FLIGHT SCHEDULE  —  All times UTC (rounded to nearest 5 min)')
     print(f'  Generated: {generated_at}   |   Data: {dr_start} → {dr_end}')
 
     for op in sorted(sched):
@@ -339,10 +362,10 @@ def write_html(sched, operators, generated_at, date_range, path=HTML_OUT):
         '<!DOCTYPE html><html lang="en"><head>',
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
-        '<title>Freight Carrier Weekly Schedule</title>',
+        '<title>Weekly Flight Schedule</title>',
         f'<style>{_CSS}</style>',
         '</head><body>',
-        '<h1>&#9992;&nbsp; Freight Carrier Weekly Schedule</h1>',
+        '<h1>&#9992;&nbsp; Weekly Flight Schedule</h1>',
         f'<p class="meta">All times UTC (rounded to nearest 5 min) &nbsp;·&nbsp; '
         f'Generated: {html_mod.escape(generated_at)}'
         f' &nbsp;·&nbsp; Data range: {html_mod.escape(dr_start)} → {html_mod.escape(dr_end)}'
@@ -412,7 +435,7 @@ def write_html(sched, operators, generated_at, date_range, path=HTML_OUT):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate freight carrier weekly schedule from flights DB.'
+        description='Generate weekly flight schedule from flights DB.'
     )
     parser.add_argument('--text', action='store_true', help='Print schedule to stdout')
     parser.add_argument('--html', action='store_true', help=f'Write {HTML_OUT}')
