@@ -166,6 +166,12 @@ def load_schedule():
         WHERE length(callsign) >= 4
           AND origin_icao IS NOT NULL AND origin_icao != ''
           AND dest_icao IS NOT NULL AND dest_icao != ''
+          AND substr(origin_icao,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(origin_icao,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(origin_icao,3,1) BETWEEN 'A' AND 'Z'
+          AND substr(dest_icao,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(dest_icao,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(dest_icao,3,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
@@ -211,6 +217,12 @@ def load_schedule():
         WHERE duration_min > 0
           AND origin_icao IS NOT NULL AND origin_icao != ''
           AND dest_icao IS NOT NULL AND dest_icao != ''
+          AND substr(origin_icao,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(origin_icao,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(origin_icao,3,1) BETWEEN 'A' AND 'Z'
+          AND substr(dest_icao,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(dest_icao,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(dest_icao,3,1) BETWEEN 'A' AND 'Z'
           AND length(callsign) >= 4
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
