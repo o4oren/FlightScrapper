@@ -164,6 +164,8 @@ def load_schedule():
         SELECT substr(callsign, 1, 3) AS op, airline_name, tail
         FROM flights
         WHERE length(callsign) >= 4
+          AND origin_icao IS NOT NULL AND origin_icao != ''
+          AND dest_icao IS NOT NULL AND dest_icao != ''
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
@@ -207,6 +209,8 @@ def load_schedule():
             CAST(ROUND(duration_min) AS INTEGER)            AS dur_min
         FROM flights
         WHERE duration_min > 0
+          AND origin_icao IS NOT NULL AND origin_icao != ''
+          AND dest_icao IS NOT NULL AND dest_icao != ''
           AND length(callsign) >= 4
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
@@ -478,6 +482,8 @@ def load_vci_data():
                    CASE WHEN route IS NOT NULL AND route != '' THEN 0 ELSE 1 END AS route_rank
             FROM flights
             WHERE duration_min > 0
+              AND origin_icao IS NOT NULL AND origin_icao != ''
+              AND dest_icao IS NOT NULL AND dest_icao != ''
               AND length(callsign) >= 4
               AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
               AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
