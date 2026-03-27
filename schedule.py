@@ -207,9 +207,9 @@ def load_schedule():
             substr(callsign, 1, 3)                          AS op,
             callsign,
             origin_icao,
-            COALESCE(origin_city, origin_icao)              AS from_city,
+            origin_icao                                     AS from_city,
             dest_icao,
-            COALESCE(dest_city,  dest_icao)                 AS to_city,
+            dest_icao                                       AS to_city,
             aircraft_type,
             CAST(strftime('%w', departure_time) AS INTEGER) AS dow,
             strftime('%H:%M', departure_time)               AS dep_utc,
@@ -219,6 +219,7 @@ def load_schedule():
         WHERE duration_min > 0
           AND origin_icao IS NOT NULL AND origin_icao != ''
           AND dest_icao IS NOT NULL AND dest_icao != ''
+          AND origin_icao != dest_icao
           AND length(callsign) >= 4
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
           AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
@@ -232,7 +233,13 @@ def load_schedule():
 
     sched = collections.defaultdict(lambda: collections.defaultdict(list))
     seen  = collections.defaultdict(lambda: collections.defaultdict(set))
-    for op, cs, orig, fc, dest, tc, ac, dow, dep, arr, dur in rows:
+    for op, cs, orig, _, dest, _, ac, dow, dep, arr, dur in rows:
+        if orig == dest:
+            continue  # skip same-airport records
+        ap_orig = airports_db.lookup_by_icao(orig)
+        ap_dest = airports_db.lookup_by_icao(dest)
+        fc = ap_orig["city"] if ap_orig and ap_orig.get("city") else orig
+        tc = ap_dest["city"] if ap_dest and ap_dest.get("city") else dest
         dep_r, arr_r = round5(dep), round5(arr)
         key = (cs, orig, dest, dep_r)
         if key not in seen[op][dow]:
@@ -383,13 +390,14 @@ def load_map_routes():
             origin_icao, dest_icao,
             origin_lat, origin_lon,
             dest_lat, dest_lon,
-            COALESCE(origin_city, origin_icao) AS origin_city,
-            COALESCE(dest_city, dest_icao)     AS dest_city
+            origin_icao AS origin_city,
+            dest_icao   AS dest_city
         FROM flights
         WHERE origin_lat IS NOT NULL AND origin_lon IS NOT NULL
           AND dest_lat IS NOT NULL AND dest_lon IS NOT NULL
           AND origin_icao IS NOT NULL AND origin_icao != ''
           AND dest_icao IS NOT NULL AND dest_icao != ''
+          AND origin_icao != dest_icao
           AND duration_min > 0
           AND length(callsign) >= 4
           AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
@@ -400,7 +408,16 @@ def load_map_routes():
     """)
     rows = cur.fetchall()
     conn.close()
-    return [r for r in rows if _known_icao(r[2]) and _known_icao(r[3])]
+    def _city(icao):
+        ap = airports_db.lookup_by_icao(icao)
+        return ap["city"] if ap and ap.get("city") else icao
+
+    return [
+        (op, cs, orig, dest, olat, olon, dlat, dlon, _city(orig), _city(dest))
+        for op, cs, orig, dest, olat, olon, dlat, dlon, _, _2
+        in rows
+        if _known_icao(orig) and _known_icao(dest)
+    ]
 
 
 def _build_map_html(routes, operators):
@@ -603,6 +620,7 @@ def load_vci_data():
             WHERE duration_min > 0
               AND origin_icao IS NOT NULL AND origin_icao != ''
               AND dest_icao IS NOT NULL AND dest_icao != ''
+              AND origin_icao != dest_icao
               AND length(callsign) >= 4
               AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
               AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
@@ -613,7 +631,8 @@ def load_vci_data():
         ORDER BY op, callsign, origin_icao, dest_icao
     """)
     # r[3]=origin_icao, r[4]=dest_icao
-    rows = [r for r in cur.fetchall() if _known_icao(r[3]) and _known_icao(r[4])]
+    rows = [r for r in cur.fetchall()
+            if _known_icao(r[3]) and _known_icao(r[4]) and r[3] != r[4]]
     conn.close()
     return rows
 
