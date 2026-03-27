@@ -89,6 +89,7 @@ AC_COLOR = {
 
 HTML_OUT = 'schedule.html'
 CSV_OUT  = 'schedule.csv'
+VCI_OUT  = 'schedule_vci.csv'
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -431,6 +432,102 @@ def write_html(sched, operators, generated_at, date_range, path=HTML_OUT):
     print(f'[schedule] HTML → {path}', file=sys.stderr)
 
 
+# ── VCI export ────────────────────────────────────────────────────────────────
+
+import math
+
+def _haversine_nm(lat1, lon1, lat2, lon2):
+    """Return great-circle distance in nautical miles."""
+    if None in (lat1, lon1, lat2, lon2):
+        return None
+    R_nm = 3440.065
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return round(R_nm * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+
+def load_vci_data():
+    """
+    Load one representative record per unique callsign + origin + dest combination.
+    Picks the most recent completed flight. Returns list of row dicts.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            callsign,
+            substr(callsign, 1, 3)                          AS op,
+            substr(callsign, 4)                             AS flight_num,
+            origin_icao, dest_icao,
+            route,
+            aircraft_type,
+            max_alt_ft,
+            origin_lat, origin_lon, dest_lat, dest_lon,
+            strftime('%H:%M', departure_time)               AS dep_utc,
+            strftime('%H:%M', arrival_time)                 AS arr_utc,
+            CAST(ROUND(duration_min) AS INTEGER)            AS dur_min,
+            flightaware_url,
+            departure_time,
+            airline_name
+        FROM flights
+        WHERE duration_min > 0
+          AND length(callsign) >= 4
+          AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
+          AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
+          AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
+        GROUP BY callsign, origin_icao, dest_icao
+        HAVING departure_time = MAX(departure_time)
+        ORDER BY op, callsign, origin_icao, dest_icao
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def write_vci_csv(operators, path=VCI_OUT):
+    rows = load_vci_data()
+    fields = [
+        'Airline Code', 'Flight number', 'ICAO-Departure', 'ICAO-Arrival',
+        'Route (without SID/STAR)', 'Aircraft', 'Flightlevel (ft)',
+        'Distance (nm)', 'Departure time (hh:mm)', 'Arrival time (hh:mm)',
+        'Flight time (minutes)', 'Link to Approve (Flightaware)',
+        'Operator', 'Company',
+    ]
+    out_rows = []
+    for (callsign, op, flight_num, orig, dest, route, ac, max_alt,
+         orig_lat, orig_lon, dest_lat, dest_lon,
+         dep, arr, dur, fa_url, dep_time, airline_name) in rows:
+
+        name, network, _, _ = operators.get(op, (airline_name or f'{op} (unknown)', '', '', ''))
+        dep_r = round5(dep) if dep else ''
+        arr_r = round5(arr) if arr else ''
+        dist = _haversine_nm(orig_lat, orig_lon, dest_lat, dest_lon)
+
+        out_rows.append({
+            'Airline Code':                  op,
+            'Flight number':                 flight_num,
+            'ICAO-Departure':                orig,
+            'ICAO-Arrival':                  dest,
+            'Route (without SID/STAR)':      route or '',
+            'Aircraft':                      AC_LABEL.get(ac, ac or ''),
+            'Flightlevel (ft)':              max_alt or '',
+            'Distance (nm)':                 dist or '',
+            'Departure time (hh:mm)':        dep_r,
+            'Arrival time (hh:mm)':          arr_r,
+            'Flight time (minutes)':         dur or '',
+            'Link to Approve (Flightaware)': fa_url or '',
+            'Operator':                      network or '',
+            'Company':                       name or '',
+        })
+
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(out_rows)
+    print(f'[schedule] VCI → {path}  ({len(out_rows)} rows)', file=sys.stderr)
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
@@ -440,14 +537,17 @@ def main():
     parser.add_argument('--text', action='store_true', help='Print schedule to stdout')
     parser.add_argument('--html', action='store_true', help=f'Write {HTML_OUT}')
     parser.add_argument('--csv',  action='store_true', help=f'Write {CSV_OUT}')
+    parser.add_argument('--vci',  action='store_true', help=f'Write {VCI_OUT} (VCI import format)')
     parser.add_argument('--html-out', default=HTML_OUT, metavar='PATH',
                         help=f'HTML output path (default: {HTML_OUT})')
     parser.add_argument('--csv-out',  default=CSV_OUT,  metavar='PATH',
                         help=f'CSV output path (default: {CSV_OUT})')
+    parser.add_argument('--vci-out',  default=VCI_OUT,  metavar='PATH',
+                        help=f'VCI CSV output path (default: {VCI_OUT})')
     args = parser.parse_args()
 
     # Default to --text if nothing specified
-    if not any([args.text, args.html, args.csv]):
+    if not any([args.text, args.html, args.csv, args.vci]):
         args.text = True
 
     sched, operators, generated_at, date_range = load_schedule()
@@ -462,6 +562,8 @@ def main():
         write_html(sched, operators, generated_at, date_range, path=args.html_out)
     if args.csv:
         write_csv(sched, operators, path=args.csv_out)
+    if args.vci:
+        write_vci_csv(operators, path=args.vci_out)
 
 
 if __name__ == '__main__':

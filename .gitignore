@@ -44,6 +44,7 @@ data/tails.json
 # Schedule output files
 schedule.html
 schedule.csv
+schedule_vci.csv
 
 # Logs
 *.log

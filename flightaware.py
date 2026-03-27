@@ -48,6 +48,21 @@ def _parse_airport(ap):
     )
 
 
+def _build_fa_url(f, origin_icao, dest_icao):
+    """Build a specific FlightAware flight URL: /live/flight/{ident}/history/{date}/{time}Z/{orig}/{dest}"""
+    ident = (f.get("ident") or "").strip()
+    actual_off = f.get("actual_off") or ""
+    if not ident or not actual_off or not origin_icao or not dest_icao:
+        return f"https://www.flightaware.com/live/flight/{ident}" if ident else None
+    try:
+        dt = datetime.fromisoformat(actual_off.replace("Z", "+00:00"))
+        date_str = dt.strftime("%Y%m%d")
+        time_str = dt.strftime("%H%M") + "Z"
+        return f"https://www.flightaware.com/live/flight/{ident}/history/{date_str}/{time_str}/{origin_icao}/{dest_icao}"
+    except Exception:
+        return f"https://www.flightaware.com/live/flight/{ident}"
+
+
 def fetch_flights_for_tail(tail):
     """
     Fetch up to FLIGHTAWARE_LOOKBACK_DAYS of completed flights for a tail number.
@@ -110,7 +125,9 @@ def fetch_flights_for_tail(tail):
             "arrival_time": actual_on,
             "duration_min": round(duration_min, 1),
             "max_alt_ft": None,
-            "flightaware_url": f"https://www.flightaware.com/live/flight/{(f.get('ident') or '').strip()}" if (f.get('ident') or '').strip() else None,
+            "flightaware_url": _build_fa_url(f, origin_icao, dest_icao),
+            "route": (f.get("route") or "").strip() or None,
+            "airline_name": (f.get("operator") or f.get("operator_iata") or "").strip() or None,
             "recorded_at": datetime.now(timezone.utc).isoformat(),
             "source": "flightaware",
         })

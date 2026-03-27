@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS flights (
     max_alt_ft      INTEGER,
     flightaware_url TEXT,
     airline_name    TEXT,
+    route           TEXT,
     recorded_at     TEXT NOT NULL,
     source          TEXT NOT NULL DEFAULT 'adsb'
 );
@@ -40,6 +41,7 @@ MIGRATIONS = [
     "ALTER TABLE flights ADD COLUMN max_alt_ft INTEGER",
     "ALTER TABLE flights ADD COLUMN flightaware_url TEXT",
     "ALTER TABLE flights ADD COLUMN airline_name TEXT",
+    "ALTER TABLE flights ADD COLUMN route TEXT",
     "ALTER TABLE flights ADD COLUMN origin_name TEXT",
     "ALTER TABLE flights ADD COLUMN origin_city TEXT",
     "ALTER TABLE flights ADD COLUMN origin_region TEXT",
@@ -176,6 +178,7 @@ def _merge_flight(conn, existing_id, flight, exact_match):
         ("dest_city", flight.get("dest_city") or None),
         ("dest_region", flight.get("dest_region") or None),
         ("dest_country", flight.get("dest_country") or None),
+        ("route", flight.get("route") or None),
     ]
     null_updates = [(col, val) for col, val in fill_if_null if val is not None]
     if null_updates:
@@ -218,8 +221,8 @@ def _insert_flight(conn, flight):
             origin_lat, origin_lon,
             dest_icao, dest_name, dest_city, dest_region, dest_country,
             dest_lat, dest_lon,
-            departure_time, arrival_time, duration_min, max_alt_ft, flightaware_url, airline_name, recorded_at, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            departure_time, arrival_time, duration_min, max_alt_ft, flightaware_url, airline_name, route, recorded_at, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             flight["callsign"],
             flight.get("tail", ""),
@@ -245,6 +248,7 @@ def _insert_flight(conn, flight):
             flight.get("max_alt_ft"),
             flight.get("flightaware_url"),
             flight.get("airline_name"),
+            flight.get("route"),
             flight["recorded_at"],
             flight.get("source", "adsb"),
         ),
