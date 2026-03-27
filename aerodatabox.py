@@ -13,6 +13,7 @@ from datetime import datetime, timezone, timedelta
 from config import (
     AERODATABOX_API_KEY,
     AERODATABOX_LOOKBACK_DAYS,
+    CALLSIGN_PREFIXES,
 )
 
 SESSION = requests.Session()
@@ -89,6 +90,11 @@ def fetch_flights_for_tail(tail):
     for f in data:
         # Skip flights still genuinely in progress
         if f.get("status") in ("EnRoute", "Unknown"):
+            continue
+
+        # Filter by callsign prefix
+        callsign = (f.get("callSign") or "").strip()
+        if CALLSIGN_PREFIXES and not any(callsign.startswith(p) for p in CALLSIGN_PREFIXES):
             continue
 
         dep_time = _parse_time(f.get("departure"))

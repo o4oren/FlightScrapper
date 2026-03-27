@@ -13,6 +13,7 @@ from config import (
     FLIGHTAWARE_API_KEY,
     FLIGHTAWARE_API_URL,
     FLIGHTAWARE_LOOKBACK_DAYS,
+    CALLSIGN_PREFIXES,
 )
 
 SESSION = requests.Session()
@@ -103,6 +104,11 @@ def fetch_flights_for_tail(tail):
         actual_off = f.get("actual_off")
         actual_on = f.get("actual_on")
         if not actual_off or not actual_on:
+            continue
+
+        # Filter by callsign prefix (same as live poller)
+        ident = (f.get("ident") or "").strip()
+        if CALLSIGN_PREFIXES and not any(ident.startswith(p) for p in CALLSIGN_PREFIXES):
             continue
 
         origin_icao, origin_name, origin_city, origin_region, origin_country, origin_lat, origin_lon = \
