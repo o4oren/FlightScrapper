@@ -23,10 +23,25 @@ SNAP_RADIUS_KM_FALLBACK = 10.0
 # Data source
 ADSB_API_URL = "https://api.adsb.lol/v2/type/{aircraft_type}"
 
+# Historical enrichment provider — choose one: "flightaware" or "aerodatabox"
+HISTORY_PROVIDER = "flightaware"
+
+# FlightAware AeroAPI — set env var FLIGHTAWARE_API_KEY or fill in below
+# Sign up: https://www.flightaware.com/aeroapi/portal
+# Free personal tier: $5/month credit (~1,000 calls). Cost: $0.005 per result set (15 records).
+# Coverage: global including Hawaii and Caribbean.
+FLIGHTAWARE_API_KEY = f"{os.environ.get('FLIGHTAWARE_API_KEY', '')}"
+FLIGHTAWARE_API_URL = "https://aeroapi.flightaware.com/aeroapi"
+FLIGHTAWARE_LOOKBACK_DAYS = 14       # Personal tier supports 14-day history
+FLIGHTAWARE_BATCH_INTERVAL_HOURS = 24
+
 # AeroDataBox API (via RapidAPI) — set env var AERODATABOX_API_KEY or fill in below
+# Sign up: https://rapidapi.com/aedbx-aedbx/api/aerodatabox
+# Free tier: 600 units/month. Basic plan: $5/month (6,000 units, ~1,000 calls).
+# Coverage: good for US/Europe, limited in Hawaii and Caribbean.
 AERODATABOX_API_KEY = f"{os.environ.get('AERODATABOX_API_KEY', '')}"
-AERODATABOX_LOOKBACK_DAYS = 7        # Free tier supports 7-day history per request
-AERODATABOX_BATCH_INTERVAL_HOURS = 24  # How often to check for tails due for a refresh
+AERODATABOX_LOOKBACK_DAYS = 7        # Basic tier supports 7-day history per request
+AERODATABOX_BATCH_INTERVAL_HOURS = 24
 
 # Known tail numbers — seed list, runtime additions saved to tails.json
 # adsb.lol will add new tails automatically as they are observed

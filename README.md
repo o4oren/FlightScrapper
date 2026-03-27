@@ -118,25 +118,58 @@ All settings are in `config.py`:
 | `SNAP_RADIUS_KM_PRIMARY` | `3.0` | Primary airport snap radius in km |
 | `SNAP_RADIUS_KM_FALLBACK` | `10.0` | Fallback snap radius if nothing found within primary |
 
-### AeroDataBox
+### Historical enrichment provider
+
+Set `HISTORY_PROVIDER` in `config.py` to choose your enrichment source:
+
+```python
+HISTORY_PROVIDER = "flightaware"   # or "aerodatabox"
+```
+
+History fetches are suppressed per tail for 7 days after a successful fetch (configurable via `FA_SUPPRESS_DAYS` in `tails.py`). When a new tail is discovered by the live poller, its history is fetched immediately.
+
+---
+
+#### FlightAware AeroAPI (recommended)
+
+| Setting | Default | Description |
+|---|---|---|
+| `FLIGHTAWARE_API_KEY` | `""` | AeroAPI key — or set env var `FLIGHTAWARE_API_KEY` |
+| `FLIGHTAWARE_LOOKBACK_DAYS` | `14` | Days of history to fetch per tail number |
+| `FLIGHTAWARE_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for refresh |
+
+**Coverage:** Global including Hawaii and Caribbean (own receiver network).
+**Cost:** $5/month free credit (~1,000 calls at $0.005/result set). Pay-as-you-go above that, no minimum.
+
+**Getting an API key:**
+1. Sign up at [flightaware.com/aeroapi/portal](https://www.flightaware.com/aeroapi/portal)
+2. The personal tier provides $5/month free credit with no subscription required
+
+---
+
+#### AeroDataBox (alternative)
 
 | Setting | Default | Description |
 |---|---|---|
 | `AERODATABOX_API_KEY` | `""` | RapidAPI key — or set env var `AERODATABOX_API_KEY` |
 | `AERODATABOX_LOOKBACK_DAYS` | `7` | Days of history to fetch per tail number |
-| `AERODATABOX_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for a refresh |
+| `AERODATABOX_BATCH_INTERVAL_HOURS` | `24` | How often to check for tails due for refresh |
 
-AeroDataBox fetches are suppressed per tail for 7 days after a successful fetch. The suppression window is set by `FA_SUPPRESS_DAYS` in `tails.py`.
+**Coverage:** Good for US and Europe. Limited in Hawaii and Caribbean.
+**Cost:** Free tier (600 units/month) or $5/month Basic plan (6,000 units, ~1,000 calls).
 
 **Getting an API key:**
 1. Sign up at [rapidapi.com](https://rapidapi.com/aedbx-aedbx/api/aerodatabox)
-2. Subscribe to the AeroDataBox Basic plan ($5/month, 3,000 calls)
-3. Copy your RapidAPI key from the dashboard
+2. Subscribe to the AeroDataBox Basic plan
 
-**Setting the key** (never put it in `config.py` or commit it to git):
+---
+
+**Setting API keys** (never put them in `config.py` or commit to git):
 ```bash
 # Add to ~/.zshrc or ~/.bashrc for persistence
-export AERODATABOX_API_KEY=your_rapidapi_key_here
+export FLIGHTAWARE_API_KEY=your_key_here
+# or
+export AERODATABOX_API_KEY=your_key_here
 source ~/.zshrc
 ```
 
@@ -154,10 +187,10 @@ Example output:
 
 ```
 FlightScrapper starting.
-  Aircraft types: C208, C408
+  Aircraft types : C208, C408
   Callsign filter: ['BEZ', 'PCM', ...]
-  Poll interval : 60s ± 10s
-  AeroDataBox  : enabled (batch every 24h)
+  Poll interval  : 60s ± 10s
+  History source : FlightAware — enabled (batch every 24h)
 Loaded 32700 airports.
 Loaded 45 known tail numbers.
 Resumed 3 in-flight aircraft from buffer.

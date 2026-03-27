@@ -93,18 +93,19 @@ def process_poll(aircraft_list):
             print(f"  New tail discovered: {tail} — fetching history...")
             tails_store.save_tails()
             try:
-                import aerodatabox
-                import database
                 import time
-                flights = aerodatabox.fetch_flights_for_tail(tail)
+                import database
+                from config import HISTORY_PROVIDER
+                provider = __import__(HISTORY_PROVIDER.replace("-", "_") if HISTORY_PROVIDER == "aerodatabox" else "flightaware")
+                flights = provider.fetch_flights_for_tail(tail)
                 time.sleep(2)
                 new_count = sum(1 for f in flights if database.save_flight_if_new(f))
                 print(f"  History for {tail}: {len(flights)} fetched, {new_count} saved")
                 tails_store.record_fa_fetch(tail)
             except ValueError:
-                # Empty response — AeroDataBox has no data for this tail
+                # Empty response — provider has no data for this tail
                 # Keep for live adsb.lol tracking, suppress for 7 days
-                print(f"  No AeroDataBox coverage for {tail} — suppressing for 7 days")
+                print(f"  No coverage for {tail} from history provider — suppressing for 7 days")
                 tails_store.record_fa_fetch(tail)
             except Exception as e:
                 print(f"  History fetch failed for {tail}: {e}")

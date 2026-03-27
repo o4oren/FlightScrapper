@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-FlightScrapper — tracks cargo feeder flights by aircraft type and airline callsign.
+FlightScrapper — generic flight tracking utility.
 
 Live tracking: polls adsb.lol every 60s, detects takeoff/landing events,
 snaps positions to OurAirports for O/D resolution, stores completed flights.
 
-Historical enrichment: AeroDataBox batch runs daily, fetching 7 days of
-history per tail number, merging missing fields into existing records
-(e.g. airport names from AeroDataBox, max altitude from live tracking).
+Historical enrichment: configurable provider (FlightAware or AeroDataBox)
+runs a daily batch per tail number, merging missing fields into existing
+records (e.g. airport names from history, max altitude from live tracking).
 """
 
 import os
@@ -16,15 +16,30 @@ import sys
 from datetime import datetime, timezone
 
 import airports
-import aerodatabox
 import database
 import tails as tails_store
 import tracker
 from config import (
-    AIRCRAFT_TYPES, AERODATABOX_API_KEY, AERODATABOX_BATCH_INTERVAL_HOURS,
-    CALLSIGN_PREFIXES, POLL_INTERVAL_SECONDS, POLL_JITTER_SECONDS,
+    AIRCRAFT_TYPES, CALLSIGN_PREFIXES, HISTORY_PROVIDER,
+    FLIGHTAWARE_API_KEY, FLIGHTAWARE_BATCH_INTERVAL_HOURS,
+    AERODATABOX_API_KEY, AERODATABOX_BATCH_INTERVAL_HOURS,
+    POLL_INTERVAL_SECONDS, POLL_JITTER_SECONDS,
 )
 from poller import fetch_aircraft, jittered_sleep
+
+
+def _load_provider():
+    """Return (module, api_key, batch_interval_hours, label) for the configured history provider."""
+    if HISTORY_PROVIDER == "flightaware":
+        import flightaware as mod
+        key = os.environ.get("FLIGHTAWARE_API_KEY") or FLIGHTAWARE_API_KEY
+        key = key if key and key != "None" and key != "" else None
+        return mod, key, FLIGHTAWARE_BATCH_INTERVAL_HOURS, "FlightAware"
+    else:
+        import aerodatabox as mod
+        key = os.environ.get("AERODATABOX_API_KEY") or AERODATABOX_API_KEY
+        key = key if key and key != "" else None
+        return mod, key, AERODATABOX_BATCH_INTERVAL_HOURS, "AeroDataBox"
 
 
 def handle_shutdown(sig, frame):
@@ -37,21 +52,22 @@ def main():
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
 
-    print(f"FlightScrapper starting.")
-    print(f"  Aircraft types: {', '.join(AIRCRAFT_TYPES)}")
-    print(f"  Callsign filter: {CALLSIGN_PREFIXES or 'all'}")
-    print(f"  Poll interval : {POLL_INTERVAL_SECONDS}s ± {POLL_JITTER_SECONDS}s")
+    provider_mod, provider_key, batch_interval, provider_label = _load_provider()
+    enrichment_enabled = bool(provider_key)
 
-    _adb_key = os.environ.get("AERODATABOX_API_KEY") or AERODATABOX_API_KEY
-    fa_enabled = bool(_adb_key and _adb_key != "")
-    print(f"  AeroDataBox  : {'enabled (batch every ' + str(AERODATABOX_BATCH_INTERVAL_HOURS) + 'h)' if fa_enabled else 'disabled (no API key)'}")
+    print(f"FlightScrapper starting.")
+    print(f"  Aircraft types : {', '.join(AIRCRAFT_TYPES)}")
+    print(f"  Callsign filter: {CALLSIGN_PREFIXES or 'all'}")
+    print(f"  Poll interval  : {POLL_INTERVAL_SECONDS}s ± {POLL_JITTER_SECONDS}s")
+    print(f"  History source : {provider_label} — "
+          f"{'enabled (batch every ' + str(batch_interval) + 'h)' if enrichment_enabled else 'disabled (no API key)'}")
 
     airports.load_airports()
     database.init_db()
     tails_store.load_tails()
     tracker.load_buffer()
 
-    last_fa_run = None
+    last_batch_run = None
     poll_count = 0
 
     while True:
@@ -68,16 +84,16 @@ def main():
 
             tracker.save_buffer()
 
-            # Run AeroDataBox batch if due
-            if fa_enabled:
+            # Run history batch if due
+            if enrichment_enabled:
                 hours_since = (
-                    (now - last_fa_run).total_seconds() / 3600
-                    if last_fa_run else AERODATABOX_BATCH_INTERVAL_HOURS
+                    (now - last_batch_run).total_seconds() / 3600
+                    if last_batch_run else batch_interval
                 )
-                if hours_since >= AERODATABOX_BATCH_INTERVAL_HOURS:
+                if hours_since >= batch_interval:
                     if tails_store.get_tails():
-                        aerodatabox.run_batch()
-                    last_fa_run = now
+                        provider_mod.run_batch()
+                    last_batch_run = now
 
         except Exception as e:
             print(f"  Error: {e}")
