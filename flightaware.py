@@ -31,14 +31,20 @@ def _headers():
 def _parse_airport(ap):
     if not ap:
         return None, None, None, None, None, None, None
+    import airports as airports_db
+    icao = ap.get("code_icao") or ap.get("code") or ap.get("icao") or ""
+    # Look up coordinates from OurAirports since FlightAware doesn't return them
+    ap_data = airports_db.lookup_by_icao(icao) if icao else None
+    lat = ap_data["lat"] if ap_data else None
+    lon = ap_data["lon"] if ap_data else None
     return (
-        ap.get("code") or ap.get("icao") or "",
+        icao,
         ap.get("name", ""),
         ap.get("city", ""),
         "",   # region not returned by AeroAPI directly
         ap.get("country_code", ""),
-        ap.get("latitude"),
-        ap.get("longitude"),
+        lat,
+        lon,
     )
 
 

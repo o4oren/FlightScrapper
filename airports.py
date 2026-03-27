@@ -60,6 +60,15 @@ def load_airports():
     print(f"Loaded {len(_airports)} airports.")
 
 
+def lookup_by_icao(icao):
+    """Return airport dict for a given ICAO code, or None if not found."""
+    icao = (icao or "").strip().upper()
+    for ap in _airports:
+        if ap["icao"].upper() == icao:
+            return ap
+    return None
+
+
 def snap_to_airport(lat, lon):
     """
     Return (airport_dict, distance_km) for best matching airport within fallback radius,
