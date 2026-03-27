@@ -51,6 +51,56 @@ MIGRATIONS = [
 ]
 
 
+def _fix_not_null_coords(conn):
+    """
+    Recreate the flights table without NOT NULL on lat/lon columns if needed.
+    SQLite doesn't support ALTER COLUMN so we use the rename-copy-drop pattern.
+    """
+    # Check if origin_lat still has NOT NULL constraint
+    info = conn.execute("PRAGMA table_info(flights)").fetchall()
+    col_map = {row[1]: row[3] for row in info}  # name -> notnull
+    if not col_map.get("origin_lat"):
+        return  # already nullable or column doesn't exist yet
+    print("Migrating lat/lon columns to nullable...")
+    conn.executescript("""
+        ALTER TABLE flights RENAME TO flights_old;
+
+        CREATE TABLE flights (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            callsign        TEXT NOT NULL,
+            tail            TEXT,
+            aircraft_type   TEXT NOT NULL,
+            icao_hex        TEXT NOT NULL,
+            origin_icao     TEXT NOT NULL,
+            origin_name     TEXT,
+            origin_city     TEXT,
+            origin_region   TEXT,
+            origin_country  TEXT,
+            origin_lat      REAL,
+            origin_lon      REAL,
+            dest_icao       TEXT NOT NULL,
+            dest_name       TEXT,
+            dest_city       TEXT,
+            dest_region     TEXT,
+            dest_country    TEXT,
+            dest_lat        REAL,
+            dest_lon        REAL,
+            departure_time  TEXT NOT NULL,
+            arrival_time    TEXT NOT NULL,
+            duration_min    REAL NOT NULL,
+            max_alt_ft      INTEGER,
+            flightaware_url TEXT,
+            airline_name    TEXT,
+            recorded_at     TEXT NOT NULL,
+            source          TEXT NOT NULL DEFAULT 'adsb'
+        );
+
+        INSERT INTO flights SELECT * FROM flights_old;
+        DROP TABLE flights_old;
+    """)
+    print("Migration complete.")
+
+
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.executescript(SCHEMA)
@@ -60,6 +110,7 @@ def init_db():
                 conn.execute(sql)
             except sqlite3.OperationalError:
                 pass
+        _fix_not_null_coords(conn)
         conn.commit()
 
 
