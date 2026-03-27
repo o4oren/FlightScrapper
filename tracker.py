@@ -98,7 +98,7 @@ def process_poll(aircraft_list):
                 from config import HISTORY_PROVIDER
                 provider = __import__(HISTORY_PROVIDER.replace("-", "_") if HISTORY_PROVIDER == "aerodatabox" else "flightaware")
                 flights = provider.fetch_flights_for_tail(tail)
-                time.sleep(3)
+                time.sleep(7)  # FlightAware: 10 req/min limit
                 new_count = sum(1 for f in flights if database.save_flight_if_new(f))
                 print(f"  History for {tail}: {len(flights)} fetched, {new_count} saved")
                 tails_store.record_fa_fetch(tail)
