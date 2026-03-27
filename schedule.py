@@ -450,10 +450,13 @@ def _haversine_nm(lat1, lon1, lat2, lon2):
 def load_vci_data():
     """
     Load one representative record per unique callsign + origin + dest combination.
-    Picks the most recent completed flight. Returns list of row dicts.
+    Prefers records with a route field set; falls back to most recent.
     """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+    # Use a subquery to rank: records with route first, then by most recent departure.
+    # SQLite's GROUP BY picks the row that satisfies the aggregate — we use MIN on a
+    # sort key that puts route-having rows first.
     cur.execute("""
         SELECT
             callsign,
@@ -470,14 +473,18 @@ def load_vci_data():
             flightaware_url,
             departure_time,
             airline_name
-        FROM flights
-        WHERE duration_min > 0
-          AND length(callsign) >= 4
-          AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
-          AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
-          AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
+        FROM (
+            SELECT *,
+                   CASE WHEN route IS NOT NULL AND route != '' THEN 0 ELSE 1 END AS route_rank
+            FROM flights
+            WHERE duration_min > 0
+              AND length(callsign) >= 4
+              AND substr(callsign,1,1) BETWEEN 'A' AND 'Z'
+              AND substr(callsign,2,1) BETWEEN 'A' AND 'Z'
+              AND substr(callsign,3,1) BETWEEN 'A' AND 'Z'
+            ORDER BY callsign, origin_icao, dest_icao, route_rank ASC, departure_time DESC
+        )
         GROUP BY callsign, origin_icao, dest_icao
-        HAVING departure_time = MAX(departure_time)
         ORDER BY op, callsign, origin_icao, dest_icao
     """)
     rows = cur.fetchall()
