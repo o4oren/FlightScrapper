@@ -56,7 +56,7 @@ def main():
     enrichment_enabled = bool(provider_key)
 
     print(f"FlightScrapper starting.")
-    print(f"  Aircraft types : {', '.join(AIRCRAFT_TYPES)}")
+    print(f"  Aircraft types : {', '.join(AIRCRAFT_TYPES) or 'all'}")
     print(f"  Callsign filter: {CALLSIGN_PREFIXES or 'all'}")
     print(f"  Poll interval  : {POLL_INTERVAL_SECONDS}s ± {POLL_JITTER_SECONDS}s")
     print(f"  History source : {provider_label} — "
