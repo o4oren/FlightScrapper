@@ -103,7 +103,7 @@ All settings are in `config.py`:
 
 | Setting | Description |
 |---|---|
-| `AIRCRAFT_TYPES` | List of ICAO type designators to track (e.g. `["C208", "C408"]`) |
+| `AIRCRAFT_TYPES` | List of ICAO type designators to track (e.g. `["C208", "C408"]`). **Must not be empty** — the live feed is fetched by aircraft type; callsign prefix filtering is applied on top of that result set |
 | `CALLSIGN_PREFIXES` | Only track callsigns starting with these prefixes. Empty list = all callsigns |
 | `KNOWN_TAILS` | Seed list of tail numbers to include in history batches from the start |
 
